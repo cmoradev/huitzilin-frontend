@@ -1,12 +1,11 @@
 import {
-  AfterViewInit,
+  ChangeDetectionStrategy,
   Component,
+  effect,
   inject,
   signal,
-  ViewChild,
-  ChangeDetectionStrategy
+  viewChild,
 } from '@angular/core';
-import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatIconButton } from '@angular/material/button';
 import {
   MatCard,
@@ -22,7 +21,7 @@ import {
 } from '@angular/material/form-field';
 import { MatIcon } from '@angular/material/icon';
 import { MatInput } from '@angular/material/input';
-import { MatPaginator } from '@angular/material/paginator';
+import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatTooltip } from '@angular/material/tooltip';
 import { AvatarComponent } from '@components/avatar/avatar.component';
@@ -31,15 +30,14 @@ import {
   BranchPartsFragment,
   GetCompaniesPageGQL,
 } from '@graphql';
-import { debounceTime, merge, startWith } from 'rxjs';
+import { toObservable } from '@angular/core/rxjs-interop';
+import { debounceTime } from 'rxjs';
 import { BranchDeleteDialogComponent } from './branch-delete-dialog/branch-delete-dialog.component';
 import { BranchFormDialogComponent } from './branch-form-dialog/branch-form-dialog.component';
-import { NgClass } from '@angular/common';
 
 @Component({
   selector: 'app-business',
   imports: [
-    NgClass,
     MatCard,
     MatCardContent,
     MatCardHeader,
@@ -52,17 +50,16 @@ import { NgClass } from '@angular/common';
     MatPrefix,
     MatTooltip,
     MatTableModule,
-    MatPaginator,
+    MatPaginatorModule,
     AvatarComponent,
-    ReactiveFormsModule,
   ],
   templateUrl: './branches.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
-export class BranchsComponent implements AfterViewInit {
-  @ViewChild('paginator') public paginator!: MatPaginator;
-  public searchControl = new FormControl('');
+export class BranchsComponent {
+  public readonly paginator = viewChild.required<MatPaginator>('paginator');
+  public readonly searchTerm = signal('');
 
   public displayedColumns: string[] = ['name', 'actions'];
   public dataSource = new MatTableDataSource<BranchPartsFragment>([]);
@@ -73,14 +70,48 @@ export class BranchsComponent implements AfterViewInit {
   private readonly dialog = inject(MatDialog);
   private readonly _companiesPageGQL = inject(GetCompaniesPageGQL);
 
-  ngAfterViewInit(): void {
-    merge(this.paginator.page, this.searchControl.valueChanges)
-      .pipe(debounceTime(300), startWith({}))
-      .subscribe({
-        next: () => {
-          this.refresh();
-        },
-      });
+  private readonly _debouncedSearchTerm = signal('');
+
+  constructor() {
+    toObservable(this.searchTerm)
+      .pipe(debounceTime(300))
+      .subscribe((term) => this._debouncedSearchTerm.set(term));
+
+    effect(() => {
+      const paginator = this.paginator();
+      const filter = this._buildFilter(this._debouncedSearchTerm());
+
+      const limit = paginator.pageSize;
+      const offset = paginator.pageIndex * limit;
+
+      this._companiesPageGQL
+        .watch({
+          variables: { limit, offset, filter },
+          fetchPolicy: 'cache-and-network',
+          nextFetchPolicy: 'cache-and-network',
+          notifyOnNetworkStatusChange: true,
+        })
+        .valueChanges.subscribe({
+          next: ({ data, loading }) => {
+            const branches = data?.branches;
+            const nodes = (branches?.nodes ?? []) as BranchPartsFragment[];
+            const totalCount = branches?.totalCount ?? 0;
+
+            this.dataSource.data = nodes;
+
+            this.loading.set(loading);
+            this.totalCount.set(totalCount);
+          },
+        });
+    });
+  }
+
+  private _buildFilter(term: string): BranchFilter {
+    return { name: { iLike: `%${term}%` } };
+  }
+
+  public onSearchInput(event: Event): void {
+    this.searchTerm.set((event.target as HTMLInputElement).value);
   }
 
   public openFormDialog(branch: BranchPartsFragment | undefined = undefined): void {
@@ -111,13 +142,12 @@ export class BranchsComponent implements AfterViewInit {
     });
   }
 
-  public refresh() {
-    const limit: number = this.paginator.pageSize;
-    const offset: number = this.paginator.pageIndex * limit;
+  public refresh(): void {
+    const paginator = this.paginator();
+    const filter = this._buildFilter(this.searchTerm());
 
-    const filter: BranchFilter = {
-      name: { iLike: `%${this.searchControl.value}%` },
-    };
+    const limit = paginator.pageSize;
+    const offset = paginator.pageIndex * limit;
 
     this._companiesPageGQL
       .watch({

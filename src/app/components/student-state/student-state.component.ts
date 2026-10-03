@@ -1,15 +1,11 @@
 import {
-  AfterViewInit,
-  booleanAttribute,
+  ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
   inject,
-  input,
-  OnInit,
   signal,
-  ChangeDetectionStrategy
 } from '@angular/core';
-import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import {
   MatAutocomplete,
   MatAutocompleteTrigger,
@@ -22,7 +18,8 @@ import { MatInput } from '@angular/material/input';
 import { AvatarComponent } from '@components/avatar/avatar.component';
 import { FetchStudentGQL, StudentPartsFragment } from '@graphql';
 import { GlobalStateService } from '@services';
-import { debounceTime, filter, merge, startWith } from 'rxjs';
+import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { debounceTime } from 'rxjs';
 
 @Component({
   selector: 'app-student-state',
@@ -33,7 +30,6 @@ import { debounceTime, filter, merge, startWith } from 'rxjs';
     MatInput,
     MatOption,
     MatFormField,
-    ReactiveFormsModule,
     MatIcon,
     MatRipple,
     AvatarComponent,
@@ -42,9 +38,10 @@ import { debounceTime, filter, merge, startWith } from 'rxjs';
   changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
-export class StudentStateComponent implements AfterViewInit, OnInit {
+export class StudentStateComponent {
   public searching = signal<boolean>(true);
-  public studentControl = new FormControl<StudentPartsFragment | string>('');
+  public readonly studentQuery = signal('');
+  public readonly selectedStudent = signal<StudentPartsFragment | null>(null);
   public loadingStudents = signal<boolean>(false);
   public students = signal<StudentPartsFragment[]>([]);
 
@@ -54,47 +51,80 @@ export class StudentStateComponent implements AfterViewInit, OnInit {
 
   public student = computed(() => this._globalStateService.student);
 
-  ngOnInit(): void {
-    // @todo - Existe un bug al cambiar de sucursal, no refrescar el autocomplete
+  private readonly _branch = toSignal(this._globalStateService.branch$, {
+    initialValue: this._globalStateService.branch,
+  });
 
-    merge(this._globalStateService.branch$).subscribe({
-      next: () => {
-        this.studentControl.setValue('');
-        this._fetchStudents('');
-      },
+  private readonly _studentState = toSignal(
+    this._globalStateService.student$,
+    { initialValue: this._globalStateService.student }
+  );
+
+  /**
+   * Versión con debounce del término de búsqueda para evitar peticiones
+   * excesivas mientras el usuario escribe.
+   */
+  private readonly _debouncedStudentQuery = signal('');
+
+  constructor() {
+    // Sincroniza el estudiante global con el control local.
+    effect(() => {
+      const student = this._studentState();
+      this.searching.set(student === null);
+
+      if (student === null) {
+        this.selectedStudent.set(null);
+        this.studentQuery.set('');
+      }
     });
 
-    this._globalStateService.student$.subscribe({
-      next: (student) => {
-        this.searching.set(student === null);
+    // Limpia el buscador al cambiar de sucursal (igual que el original).
+    effect(() => {
+      this._branch();
+      this.selectedStudent.set(null);
+      this.studentQuery.set('');
+      this._fetchStudents('');
+    });
 
-        if (student === null) {
-          this.studentControl.setValue('');
-        }
-      },
+    // Aplica la selección al estado global cuando se elige un estudiante.
+    effect(() => {
+      const selected = this.selectedStudent();
+      if (selected) {
+        this._globalStateService.student = selected;
+      }
+    });
+
+    // Reacciona al término de búsqueda (con debounce) y a cambios de sucursal.
+    toObservable(this.studentQuery)
+      .pipe(debounceTime(300))
+      .subscribe((value) => {
+        this._debouncedStudentQuery.set(value);
+      });
+
+    effect(() => {
+      const term = this._debouncedStudentQuery();
+      this._branch();
+      this._fetchStudents(term);
     });
   }
 
-  ngAfterViewInit(): void {
-    merge(this.studentControl.valueChanges, this._globalStateService.branch$)
-      .pipe(debounceTime(300), startWith(''))
-      .subscribe({
-        next: (value) => {
-          if (typeof value === 'string') this._fetchStudents(value);
-        },
-      });
+  public onSearchInput(event: Event): void {
+    this.studentQuery.set((event.target as HTMLInputElement).value);
+  }
 
-    this.studentControl.valueChanges
-      .pipe(filter((value) => typeof value === 'object'))
-      .subscribe({
-        next: (value) => {
-          this._globalStateService.student = value;
-        },
-      });
+  public onStudentSelected(student: StudentPartsFragment): void {
+    this.selectedStudent.set(student);
+    this.studentQuery.set(student.fullname);
+    this.searching.set(false);
   }
 
   public toggleStudent(): void {
     this.searching.update((prev) => !prev);
+
+    if (this.searching()) {
+      this.selectedStudent.set(null);
+      this.studentQuery.set('');
+    }
   }
 
   public displayFn(value: StudentPartsFragment): string {
@@ -102,7 +132,8 @@ export class StudentStateComponent implements AfterViewInit, OnInit {
   }
 
   private _fetchStudents(value: string): void {
-    if (!!this._globalStateService.branch?.id) {
+    const branch = this._globalStateService.branch;
+    if (!!branch?.id) {
       this.loadingStudents.set(true);
 
       this._fetchStudentGQL
@@ -112,7 +143,7 @@ export class StudentStateComponent implements AfterViewInit, OnInit {
             offset: 0,
             filter: {
               active: { is: true },
-              branchs: { id: { eq: this._globalStateService.branch!.id } },
+              branchs: { id: { eq: branch.id } },
               or: [
                 { fullname: { iLike: `%${value}%` } },
                 { code: { eq: `${value}` } },

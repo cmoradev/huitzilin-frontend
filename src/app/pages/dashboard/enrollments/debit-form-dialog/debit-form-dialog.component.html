@@ -1,9 +1,9 @@
 <h2 mat-dialog-title>{{ !!data?.id ? "Actualizar" : "Crear" }} adeudo</h2>
 <mat-dialog-content>
-  <form id="dataForm" [formGroup]="formGroup" (ngSubmit)="submit()">
+  <form id="dataForm" [formRoot]="debitForm" (submit)="submit()">
     <div class="flex flex-col gap-3">
       <mat-checkbox
-        formControlName="withTax"
+        [formField]="debitForm.withTax"
         matTooltip="El IVA se aplica despues de los descuentos"
       >
         ¿Incluye IVA?
@@ -11,7 +11,7 @@
 
       <mat-form-field>
         <mat-label>Frecuencia de pago</mat-label>
-        <mat-select formControlName="frequency">
+        <mat-select [formField]="debitForm.frequency">
           @for (frequency of frequencies; track $index) {
           <mat-option [value]="frequency.value">{{
             frequency.label
@@ -21,9 +21,11 @@
         <mat-hint
           >Seleccione la frecuencia con la que se realizará el pago</mat-hint
         >
-        <mat-error>
-          {{ formTools.checkForErrorsIn(formGroup.get("frequency")) }}
-        </mat-error>
+        @if (debitForm.frequency().touched() && debitForm.frequency().invalid()) {
+          <mat-error>
+            {{ debitForm.frequency().errors()[0].message }}
+          </mat-error>
+        }
       </mat-form-field>
 
       <mat-form-field>
@@ -31,12 +33,14 @@
         <input
           matInput
           placeholder="Ej: Mensualidad del servicio"
-          formControlName="description"
+          [formField]="debitForm.description"
         />
         <mat-hint>Ingrese una descripción detallada del adeudo</mat-hint>
-        <mat-error>
-          {{ formTools.checkForErrorsIn(formGroup.get("description")) }}
-        </mat-error>
+        @if (debitForm.description().touched() && debitForm.description().invalid()) {
+          <mat-error>
+            {{ debitForm.description().errors()[0].message }}
+          </mat-error>
+        }
       </mat-form-field>
 
       <div class="grid grid-cols-2 gap-3">
@@ -45,13 +49,15 @@
           <input
             matInput
             placeholder="Ej: 100.00"
-            formControlName="unitPrice"
+            [formField]="debitForm.unitPrice"
             type="number"
           />
           <mat-hint>Precio por unidad del concepto</mat-hint>
-          <mat-error>
-            {{ formTools.checkForErrorsIn(formGroup.get("unitPrice")) }}
-          </mat-error>
+          @if (debitForm.unitPrice().touched() && debitForm.unitPrice().invalid()) {
+            <mat-error>
+              {{ debitForm.unitPrice().errors()[0].message }}
+            </mat-error>
+          }
         </mat-form-field>
 
         <mat-form-field>
@@ -59,13 +65,15 @@
           <input
             matInput
             placeholder="Ej: 2"
-            formControlName="quantity"
+            [formField]="debitForm.quantity"
             type="number"
           />
           <mat-hint>Cantidad de unidades a cobrar</mat-hint>
-          <mat-error>
-            {{ formTools.checkForErrorsIn(formGroup.get("quantity")) }}
-          </mat-error>
+          @if (debitForm.quantity().touched() && debitForm.quantity().invalid()) {
+            <mat-error>
+              {{ debitForm.quantity().errors()[0].message }}
+            </mat-error>
+          }
         </mat-form-field>
       </div>
 
@@ -74,29 +82,27 @@
         <input
           matInput
           placeholder="Ej: 200.00"
-          formControlName="amount"
+          [formField]="debitForm.amount"
           type="number"
         />
         <mat-hint>Importe total a cobrar por el adeudo</mat-hint>
-        <mat-error>
-          {{ formTools.checkForErrorsIn(formGroup.get("amount")) }}
-        </mat-error>
+        @if (debitForm.amount().touched() && debitForm.amount().invalid()) {
+          <mat-error>
+            {{ debitForm.amount().errors()[0].message }}
+          </mat-error>
+        }
       </mat-form-field>
 
-      <mat-chip-set formArrayName="discounts">
-        @for (discountFormGroup of discounts.controls; track $index +
-        discountFormGroup.get('value')?.value) {
+      <mat-chip-set>
+        @for (discount of discounts(); track discount.id; let i = $index) {
         <mat-chip>
-          @if (discountFormGroup.get('type')?.value === 'PERCENTAGE') {
-          <span>- {{ discountFormGroup.get("value")?.value }} %</span>
-          } @else if (discountFormGroup.get('type')?.value === 'FIXED') {
-          <span
-            >-
-            {{ $safeNavigationMigration(discountFormGroup.get("value")?.value) | currency : "MXN" }}</span
-          >
+          @if (discount.type === 'PERCENTAGE') {
+          <span>- {{ discount.value }} %</span>
+          } @else if (discount.type === 'FIXED') {
+          <span>- {{ discount.value | currency : "MXN" }}</span>
           }
 
-          <button matChipRemove (click)="removeDiscount($index)">
+          <button matChipRemove (click)="removeDiscount(i)">
             <mat-icon>cancel</mat-icon>
           </button>
         </mat-chip>
@@ -106,13 +112,13 @@
       </mat-chip-set>
 
       <div class="grid grid-cols-2 gap-3">
-        @if (formGroup.get('frequency')?.value !== 'MONTHLY') {
+        @if (debitModel().frequency !== 'MONTHLY') {
         <mat-form-field>
           <mat-label>Fecha del pago</mat-label>
           <input
             matInput
             [matDatepicker]="datepicker"
-            formControlName="dueDate"
+            [formField]="debitForm.dueDate"
           />
           <mat-hint>Seleccione la fecha de pago</mat-hint>
           <mat-datepicker-toggle
@@ -120,23 +126,27 @@
             [for]="datepicker"
           ></mat-datepicker-toggle>
           <mat-datepicker #datepicker> </mat-datepicker>
-          <mat-error>
-            {{ formTools.checkForErrorsIn(formGroup.get("dueDate")) }}
-          </mat-error>
+          @if (debitForm.dueDate().touched() && debitForm.dueDate().invalid()) {
+            <mat-error>
+              {{ debitForm.dueDate().errors()[0].message }}
+            </mat-error>
+          }
         </mat-form-field>
         }
 
         <mat-form-field>
           <mat-label>Estado del adeudo</mat-label>
-          <mat-select formControlName="state">
+          <mat-select [formField]="debitForm.state">
             @for (state of states; track $index) {
             <mat-option [value]="state.value">{{ state.label }}</mat-option>
             }
           </mat-select>
           <mat-hint>Seleccione el estado actual</mat-hint>
-          <mat-error>
-            {{ formTools.checkForErrorsIn(formGroup.get("state")) }}
-          </mat-error>
+          @if (debitForm.state().touched() && debitForm.state().invalid()) {
+            <mat-error>
+              {{ debitForm.state().errors()[0].message }}
+            </mat-error>
+          }
         </mat-form-field>
       </div>
     </div>
@@ -148,7 +158,7 @@
       <div class="flex gap-2 w-full">
         <p class="w-full text-right font-semibold">Descuentos</p>
         <p class="w-full text-right">
-          {{ this.formGroup.get("discount")?.value ?? 0 | currency : "MXN" }}
+          {{ debitModel().discount | currency : "MXN" }}
         </p>
       </div>
       <div class="flex gap-2 w-full">

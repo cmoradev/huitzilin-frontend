@@ -1,11 +1,19 @@
-<form class="flex flex-col gap-2 mt-2" [formGroup]="form()">
+<div class="flex flex-col gap-2 mt-2">
   <mat-form-field>
     <mat-label>Monto</mat-label>
-    <input type="number" matInput formControlName="amount" />
+    <input
+      type="number"
+      matInput
+      [value]="payment().amount"
+      (input)="onAmount(+$any($event.target).value)"
+      (blur)="paymentForm.amount().markAsTouched()"
+    />
     <mat-hint> Monto a cobrar (MXN) </mat-hint>
-    <mat-error>
-      {{ formTools.checkForErrorsIn(form().get("amount")) }}
-    </mat-error>
+    @if (paymentForm.amount().touched() && paymentForm.amount().invalid()) {
+      <mat-error>
+        {{ paymentForm.amount().errors()[0].message }}
+      </mat-error>
+    }
   </mat-form-field>
   <div class="flex gap-2">
     <mat-form-field>
@@ -14,14 +22,18 @@
         type="datetime"
         matInput
         [matDatepicker]="datepicker"
-        formControlName="date"
+        [value]="payment().date"
+        (change)="onDate($any($event.target).value)"
+        (blur)="paymentForm.date().markAsTouched()"
       />
       <mat-datepicker #datepicker />
       <mat-datepicker-toggle [for]="datepicker" matSuffix />
       <mat-hint> Fecha de cobro </mat-hint>
-      <mat-error>
-        {{ formTools.checkForErrorsIn(form().get("date")) }}
-      </mat-error>
+      @if (paymentForm.date().touched() && paymentForm.date().invalid()) {
+        <mat-error>
+          {{ paymentForm.date().errors()[0].message }}
+        </mat-error>
+      }
     </mat-form-field>
 
     <mat-form-field>
@@ -30,34 +42,52 @@
         type="datetime"
         matInput
         [matTimepicker]="timepicker"
-        formControlName="date"
+        [value]="payment().date"
+        (change)="onDate($any($event.target).value)"
+        (blur)="paymentForm.date().markAsTouched()"
       />
       <mat-timepicker #timepicker />
       <mat-timepicker-toggle [for]="timepicker" matSuffix />
       <mat-hint> Hora de cobro </mat-hint>
-      <mat-error>
-        {{ formTools.checkForErrorsIn(form().get("date")) }}
-      </mat-error>
+      @if (paymentForm.date().touched() && paymentForm.date().invalid()) {
+        <mat-error>
+          {{ paymentForm.date().errors()[0].message }}
+        </mat-error>
+      }
     </mat-form-field>
   </div>
 
-  @if (form().get("method")?.value !== "CASH") {
+  @if (payment().method !== "CASH") {
   <mat-form-field>
     <mat-label>Referencia</mat-label>
-    <input matInput formControlName="transaction" />
+    <input
+      matInput
+      [value]="payment().transaction"
+      (input)="onTransaction($any($event.target).value)"
+      (blur)="paymentForm.transaction().markAsTouched()"
+    />
     <mat-hint> Referencia de la transacción</mat-hint>
-    <mat-error>
-      {{ formTools.checkForErrorsIn(form().get("transaction")) }}
-    </mat-error>
+    @if (paymentForm.transaction().touched() && paymentForm.transaction().invalid()) {
+      <mat-error>
+        {{ paymentForm.transaction().errors()[0].message }}
+      </mat-error>
+    }
   </mat-form-field>
 
   <mat-form-field>
     <mat-label>Nombre del banco </mat-label>
-    <input matInput formControlName="bank" />
+    <input
+      matInput
+      [value]="payment().bank"
+      (input)="onBank($any($event.target).value)"
+      (blur)="paymentForm.bank().markAsTouched()"
+    />
     <mat-hint> Nombre del banco </mat-hint>
-    <mat-error>
-      {{ formTools.checkForErrorsIn(form().get("bank")) }}
-    </mat-error>
+    @if (paymentForm.bank().touched() && paymentForm.bank().invalid()) {
+      <mat-error>
+        {{ paymentForm.bank().errors()[0].message }}
+      </mat-error>
+    }
   </mat-form-field>
   }
-</form>
+</div>

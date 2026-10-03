@@ -1,6 +1,6 @@
 <h2 mat-dialog-title>Recibir pago</h2>
 <mat-dialog-content>
-  <form id="paymentForm" [formGroup]="paymentsForm" (ngSubmit)="submit()">
+  <form id="paymentForm" [formRoot]="chargeForm" (submit)="submit()">
     <div class="flex justify-between gap-2">
       <p>
         <span class="font-bold">Deuda total:</span>
@@ -12,22 +12,24 @@
       </p>
     </div>
 
+    @if (chargeForm().touched() && chargeForm().invalid()) {
     <mat-error>
-      {{ formTools.checkForErrorsIn(paymentsForm) }}
+      {{ chargeForm().errors()[0].message }}
     </mat-error>
+    }
 
-    <mat-tab-group formArrayName="payments">
-      @for (paymentForm of payments.controls; track $index +
-      paymentForm.get('method')?.value) {
+    <mat-tab-group>
+      @for (payment of paymentsModel().payments; track $index + payment.method) {
       <mat-tab>
         <ng-template mat-tab-label>
-          <mat-icon
-            [svgIcon]="paymentIcons[paymentForm.get('method')!.value]"
-          />
-          {{ paymentNames[paymentForm.get("method")!.value] }}
+          <mat-icon [svgIcon]="paymentIcons[payment.method]" />
+          {{ paymentNames[payment.method] }}
         </ng-template>
 
-        <app-charge-form [form]="paymentForm" />
+        <app-charge-form
+          [payment]="payment"
+          (update)="updatePayment($index, $event)"
+        />
       </mat-tab>
       }
     </mat-tab-group>

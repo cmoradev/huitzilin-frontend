@@ -1,24 +1,35 @@
 <h2 mat-dialog-title>{{ !!data?.id ? "Actualizar" : "Crear" }} negocio</h2>
 <mat-dialog-content>
-  <form id="dataForm" [formGroup]="formGroup" (ngSubmit)="submit()">
+  <form id="dataForm" [formRoot]="branchForm" (submit)="submit()">
     <div class="flex flex-col gap-3">
-      <app-image-picker formControlName="picture"></app-image-picker>
+      <app-image-picker [formField]="branchForm.picture"></app-image-picker>
+      @if (branchForm.picture().touched() && branchForm.picture().invalid()) {
+        <mat-error class="text-red-500 text-sm">
+          {{ branchForm.picture().errors()[0].message }}
+        </mat-error>
+      }
 
       <mat-form-field>
         <mat-label>Nombre</mat-label>
-        <input matInput placeholder="Ej: Step Ups" formControlName="name" />
+        <input
+          matInput
+          placeholder="Ej: Step Ups"
+          [formField]="branchForm.name"
+        />
         <mat-hint>Ingrese el nombre comercial del negocio</mat-hint>
-        <mat-error>
-          {{ formTools.checkForErrorsIn(formGroup.get("name")) }}
-        </mat-error>
+        @if (branchForm.name().touched() && branchForm.name().invalid()) {
+          <mat-error>
+            {{ branchForm.name().errors()[0].message }}
+          </mat-error>
+        }
       </mat-form-field>
 
       <mat-form-field class="w-full">
         <mat-label>Cuenta clip</mat-label>
-        <mat-select formControlName="clipAccountID">
-          @for (branch of clipAccountTools.options(); track $index) {
-          <mat-option [value]="branch.id">
-            {{ branch.name }}
+        <mat-select [formField]="branchForm.clipAccountID">
+          @for (clip of clipAccountTools.options(); track $index) {
+          <mat-option [value]="clip.id">
+            {{ clip.name }}
           </mat-option>
           }
         </mat-select>

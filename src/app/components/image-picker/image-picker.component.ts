@@ -1,51 +1,47 @@
 import { NgStyle } from '@angular/common';
-import { Component, forwardRef, Input, Optional, Self, ChangeDetectionStrategy } from '@angular/core';
 import {
-  ControlValueAccessor,
-  NG_VALUE_ACCESSOR,
-  NgControl,
-} from '@angular/forms';
+  ChangeDetectionStrategy,
+  Component,
+  input,
+  model,
+} from '@angular/core';
+import { FormValueControl } from '@angular/forms/signals';
 
 @Component({
   selector: 'app-image-picker',
   imports: [NgStyle],
   templateUrl: './image-picker.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
-  providers: [
-    {
-      provide: NG_VALUE_ACCESSOR,
-      useExisting: forwardRef(() => ImagePickerComponent),
-      multi: true,
-    },
-  ],
+  styles: ``,
 })
-export class ImagePickerComponent implements ControlValueAccessor {
-  @Input({ required: false }) imageSource = 'images/image-default.png';
-  @Input({ required: false }) width = '6rem';
-  @Input({ required: false }) height = '6rem';
+export class ImagePickerComponent implements FormValueControl<File | string> {
+  public readonly imageSource = input('images/image-default.png');
+  public readonly width = input('6rem');
+  public readonly height = input('6rem');
 
-  private onChange: (value: File | null) => void = () => {};
-  private onTouched: () => void = () => {};
+  /**
+   * El modelo emite tanto un `File` (cuando el usuario selecciona una
+   * nueva imagen) como una cadena con la URL existente al cargar el
+   * registro original.
+   */
+  public readonly value = model<File | string>('');
 
-  onFileSelected(event: Event): void {
-    const file = (event.target as HTMLInputElement).files?.[0] || null;
+  public onFileSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0] ?? null;
+
     if (file) {
-      this.imageSource = URL.createObjectURL(file);
-
-      this.onTouched();
-      this.onChange(file);
+      this.value.set(file);
     }
+
+    input.value = '';
   }
 
-  writeValue(value: string | null): void {
-    this.imageSource = value || 'images/image-default.png';
-  }
-
-  registerOnChange(fn: any): void {
-    this.onChange = fn;
-  }
-
-  registerOnTouched(fn: any): void {
-    this.onTouched = fn;
+  public get preview(): string {
+    const current = this.value();
+    if (current instanceof File) {
+      return URL.createObjectURL(current);
+    }
+    return current || 'images/image-default.png';
   }
 }

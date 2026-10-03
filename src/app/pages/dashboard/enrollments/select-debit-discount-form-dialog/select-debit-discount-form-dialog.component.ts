@@ -1,5 +1,11 @@
-import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
-import { ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  effect,
+  inject,
+  OnInit,
+  signal,
+} from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -8,28 +14,35 @@ import {
   GetDiscountsPageGQL,
   GetDiscountsPageQueryVariables,
 } from '@graphql';
-import { FormToolsService, GlobalStateService } from '@services';
+import { GlobalStateService } from '@services';
 import { map } from 'rxjs';
 import { MatSelectModule } from '@angular/material/select';
 import { CurrencyPipe } from '@angular/common';
+import {
+  form,
+  FormField,
+  FormRoot,
+  required,
+} from '@angular/forms/signals';
+import { SelectDiscountFormFields } from '@app/types/discounts';
 
 @Component({
   selector: 'app-select-debit-discount-form-dialog',
   imports: [
     MatDialogModule,
-    ReactiveFormsModule,
     MatButtonModule,
     MatFormFieldModule,
     MatSelectModule,
-    CurrencyPipe
+    CurrencyPipe,
+    FormField,
+    FormRoot,
   ],
   templateUrl: './select-debit-discount-form-dialog.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
-export class SelectDebitDiscountFormDialogComponent {
+export class SelectDebitDiscountFormDialogComponent implements OnInit {
   private readonly _globalState = inject(GlobalStateService);
-  public readonly formTools = inject(FormToolsService);
 
   private readonly _dialogRef = inject(
     MatDialogRef<SelectDebitDiscountFormDialogComponent>
@@ -40,74 +53,82 @@ export class SelectDebitDiscountFormDialogComponent {
   public discounts = signal<DiscountPartsFragment[]>([]);
   public loading = signal(false);
 
-  public formGroup = this.formTools.builder.group({
-    discount: this.formTools.builder.control<DiscountPartsFragment | null>(
-      null,
-      {
-        validators: [Validators.required],
-        nonNullable: true,
-      }
-    ),
+  public readonly selectModel = signal<SelectDiscountFormFields>({
+    discountId: null,
   });
+
+  public readonly selectForm = form(this.selectModel, (schema) => {
+    required(schema.discountId, { message: 'Seleccione un descuento' });
+  });
+
+  constructor() {
+    effect(() => {
+      this._dialogRef.disableClose = this.loading();
+    });
+  }
 
   ngOnInit(): void {
     this._fetchAllDiscounts();
   }
 
   public submit(): void {
-    if (this.formGroup.valid) {
-      this.loading.set(true);
+    if (this.selectForm().invalid()) {
+      return;
+    }
 
-      const values = this.formGroup.getRawValue();
+    const id = this.selectModel().discountId;
+    const selected = id ? this.discounts().find((d) => d.id === id) : null;
 
-      if (values.discount?.id) {
-        this._dialogRef.close(values.discount);
-      }
+    if (selected) {
+      this._dialogRef.close(selected);
     }
   }
 
   private _fetchAllDiscounts(accumulared: DiscountPartsFragment[] = []): void {
-    if (this._globalState.branch?.id) {
-      const limit = 50;
-      const offset = accumulared.length;
+    const branch = this._globalState.branch;
+    if (!branch?.id) {
+      return;
+    }
 
-      const params: GetDiscountsPageQueryVariables = {
-        filter: {
-          branchId: { eq: this._globalState.branch!.id },
-        },
-        limit,
-        offset,
-      };
+    const limit = 50;
+    const offset = accumulared.length;
 
-      const getDiscounts$ = this._discountsPageGQL
-        .watch({
-          variables: params,
-          fetchPolicy: 'cache-and-network', // Usa cache primero, solo pide a la API si no hay datos en cache
-          nextFetchPolicy: 'cache-and-network', // Mantiene la política de cache en siguientes peticiones
-          notifyOnNetworkStatusChange: false, // No notifica cambios de red para evitar refetch innecesario
-        })
-        .valueChanges;
+    const params: GetDiscountsPageQueryVariables = {
+      filter: {
+        branchId: { eq: branch.id },
+      },
+      limit,
+      offset,
+    };
 
-      getDiscounts$.pipe(map((resp) => resp.data?.discounts)).subscribe({
-        next: (discounts) => {
-          if (!discounts) return;
+    this._discountsPageGQL
+      .watch({
+        variables: params,
+        fetchPolicy: 'cache-and-network',
+        nextFetchPolicy: 'cache-and-network',
+        notifyOnNetworkStatusChange: false,
+      })
+      .valueChanges.subscribe({
+        next: (resp) => {
+          const discounts = resp.data?.discounts;
+          if (!discounts) {
+            return;
+          }
 
           const nodes = (discounts.nodes ?? []) as DiscountPartsFragment[];
           const totalCount = discounts.totalCount ?? 0;
-
           const allItems = accumulared.concat(nodes);
 
           if (allItems.length >= totalCount) {
             this.discounts.set(allItems);
-            return; // No more fees to fetch
+            return;
           }
 
           this._fetchAllDiscounts(allItems);
         },
         error: (error) => {
-          console.error('Error fetching fees', error);
+          console.error('Error fetching discounts', error);
         },
       });
-    }
   }
 }

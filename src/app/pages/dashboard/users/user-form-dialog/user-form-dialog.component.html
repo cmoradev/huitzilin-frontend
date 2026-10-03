@@ -1,6 +1,6 @@
 <h2 mat-dialog-title>{{ !!data?.id ? "Actualizar" : "Crear" }} usuario</h2>
 <mat-dialog-content>
-  <form id="dataForm" [formGroup]="formGroup" (ngSubmit)="submit()">
+  <form id="dataForm" [formRoot]="userForm" (submit)="submit()">
     <div class="flex flex-col gap-3">
       <mat-form-field>
         <mat-label>Correo electrónico</mat-label>
@@ -8,37 +8,54 @@
           type="email"
           matInput
           placeholder="Ej: example@domain.com"
-          formControlName="email"
+          [formField]="userForm.email"
         />
         <mat-hint>Ingrese el correo electrónico</mat-hint>
-        <mat-error>
-          {{ formTools.checkForErrorsIn(formGroup.get("email")) }}
-        </mat-error>
+        @if (userForm.email().touched() && userForm.email().invalid()) {
+          <mat-error>
+            {{ userForm.email().errors()[0].message }}
+          </mat-error>
+        }
       </mat-form-field>
 
       <mat-form-field>
         <mat-label>Nombre de usuario</mat-label>
-        <input matInput placeholder="Ej: jperez" formControlName="username" />
+        <input
+          matInput
+          placeholder="Ej: jperez"
+          [formField]="userForm.username"
+        />
         <mat-hint>Ingrese el nombre de usuario</mat-hint>
-        <mat-error>
-          {{ formTools.checkForErrorsIn(formGroup.get("username")) }}
-        </mat-error>
+        @if (userForm.username().touched() && userForm.username().invalid()) {
+          <mat-error>
+            {{ userForm.username().errors()[0].message }}
+          </mat-error>
+        }
+        @if (userForm.username().pending()) {
+          <mat-hint>Verificando disponibilidad...</mat-hint>
+        }
       </mat-form-field>
 
       @if (!data?.id) {
       <mat-form-field>
         <mat-label>Contraseña</mat-label>
-        <input matInput placeholder="Ej: ********" formControlName="password" />
+        <input
+          matInput
+          placeholder="Ej: ********"
+          [formField]="userForm.password"
+        />
         <mat-hint>Ingrese la contraseña</mat-hint>
-        <mat-error>
-          {{ formTools.checkForErrorsIn(formGroup.get("password")) }}
-        </mat-error>
+        @if (userForm.password().touched() && userForm.password().invalid()) {
+          <mat-error>
+            {{ userForm.password().errors()[0].message }}
+          </mat-error>
+        }
       </mat-form-field>
       }
 
       <mat-form-field class="w-full">
         <mat-label>Sucursal</mat-label>
-        <mat-select formControlName="branchId">
+        <mat-select [formField]="userForm.branchId">
           @for (branch of branchTools.options(); track $index) {
           <mat-option [value]="branch.id">
             <div class="flex items-center gap-2">
@@ -48,25 +65,29 @@
           </mat-option>
           }
         </mat-select>
-        <mat-error>
-          {{ formTools.checkForErrorsIn(formGroup.get("branchId")) }}
-        </mat-error>
+        @if (userForm.branchId().touched() && userForm.branchId().invalid()) {
+          <mat-error>
+            {{ userForm.branchId().errors()[0].message }}
+          </mat-error>
+        }
         <mat-hint> Seleccione una sucursal </mat-hint>
       </mat-form-field>
 
       <mat-form-field class="w-full">
         <mat-label>Ciclo</mat-label>
-        <mat-select formControlName="cycleId">
+        <mat-select [formField]="userForm.cycleId">
           @for (cycle of cycleTools.options(); track $index) {
           <mat-option [value]="cycle.id">
             {{ cycle.name }}
           </mat-option>
           }
         </mat-select>
-        <mat-error>
-          {{ formTools.checkForErrorsIn(formGroup.get("cycleId")) }}
-        </mat-error>
-        <mat-hint> Seleccione una sucursal </mat-hint>
+        @if (userForm.cycleId().touched() && userForm.cycleId().invalid()) {
+          <mat-error>
+            {{ userForm.cycleId().errors()[0].message }}
+          </mat-error>
+        }
+        <mat-hint> Seleccione un ciclo escolar </mat-hint>
       </mat-form-field>
     </div>
   </form>

@@ -13,7 +13,10 @@
 
   <mat-form-field class="w-full">
     <mat-label>Sucursal</mat-label>
-    <mat-select [formControl]="branchControl">
+    <mat-select
+      [value]="branchId()"
+      (valueChange)="branchId.set($event)"
+    >
       @for (branch of branchTools.options(); track $index) {
       <mat-option [value]="branch.id">
         <div class="flex items-center gap-2">
@@ -33,7 +36,10 @@
 
   <mat-form-field class="w-full">
     <mat-label>Ciclo escolar</mat-label>
-    <mat-select [formControl]="cycleControl">
+    <mat-select
+      [value]="cycleId()"
+      (valueChange)="cycleId.set($event)"
+    >
       @for (cycle of cycleTools.options(); track $index) {
       <mat-option [value]="cycle.id">{{ cycle.name }}</mat-option>
       }

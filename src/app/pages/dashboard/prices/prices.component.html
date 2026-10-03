@@ -8,11 +8,12 @@
       <div class="col-span-1 flex flex-col h-[calc(100vh-11rem)]">
         <div class="flex items-center gap-2 p-2">
           <mat-form-field subscriptSizing="dynamic" class="w-full">
-            <input
-              matInput
-              placeholder="Ej. Paquete 1, Actividad 1"
-              [formControl]="searchControl"
-            />
+<input
+            matInput
+            placeholder="Ej. Paquete 1, Actividad 1"
+            [value]="searchTerm()"
+            (input)="onSearchInput($event)"
+          />
           </mat-form-field>
           <button
             mat-icon-button

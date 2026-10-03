@@ -1,10 +1,10 @@
 <div
   class="mx-auto cursor-pointer"
-  [ngStyle]="{ height: height, width: width }"
+  [ngStyle]="{ height: height(), width: width() }"
   (click)="fileInput.click()"
 >
   <img
-    [src]="imageSource"
+    [src]="preview"
     alt="Picker Image"
     class="w-full h-full object-cover rounded-[var(--mat-sys-corner-medium)]"
   />

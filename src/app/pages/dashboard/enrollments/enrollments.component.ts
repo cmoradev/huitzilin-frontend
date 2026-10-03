@@ -4,7 +4,6 @@ import {
   moveItemInArray,
 } from '@angular/cdk/drag-drop';
 import { Component, computed, inject, OnInit, signal, ChangeDetectionStrategy } from '@angular/core';
-import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatDialog } from '@angular/material/dialog';
@@ -26,7 +25,8 @@ import {
 } from '@graphql';
 import { GlobalStateService } from '@services';
 import { NgScrollbar } from 'ngx-scrollbar';
-import { debounceTime, map, merge, tap } from 'rxjs';
+import { debounceTime, map, tap } from 'rxjs';
+import { toObservable } from '@angular/core/rxjs-interop';
 import { DebitDeleteDialogComponent } from './debit-delete-dialog/debit-delete-dialog.component';
 import { DebitFormCatalogDialogComponent } from './debit-form-catalog-dialog/debit-form-catalog-dialog.component';
 import { DebitFormDialogComponent } from './debit-form-dialog/debit-form-dialog.component';
@@ -47,7 +47,6 @@ import { LightOnPricesComponent } from './light-on-prices/light-on-prices.compon
     MatFormFieldModule,
     MatButtonModule,
     MatInputModule,
-    ReactiveFormsModule,
     MatMenuModule,
     DragDropModule,
     MatTooltipModule,
@@ -81,21 +80,32 @@ export class EnrollmentsComponent implements OnInit {
   public debitsLoading = signal<boolean>(false);
   public debitsTotalCount = signal<number>(0);
 
-  public searchControl = new FormControl('');
+  public readonly searchTerm = signal('');
+
+  private readonly _debouncedSearchTerm = signal('');
 
   ngOnInit(): void {
-    merge(
-      this._globalStateService.branch$,
-      this._globalStateService.cycle$,
-      this._globalStateService.student$,
-      this.searchControl.valueChanges
-    )
+    toObservable(this.searchTerm)
       .pipe(debounceTime(300))
-      .subscribe({
-        next: () => {
-          this.refreshEnrollments();
-        },
-      });
+      .subscribe((term) => this._debouncedSearchTerm.set(term));
+
+    this._globalStateService.branch$.subscribe({
+      next: () => {
+        this.refreshEnrollments();
+      },
+    });
+
+    this._globalStateService.cycle$.subscribe({
+      next: () => {
+        this.refreshEnrollments();
+      },
+    });
+
+    this._globalStateService.student$.subscribe({
+      next: () => {
+        this.refreshEnrollments();
+      },
+    });
 
     this._globalStateService.enrollment$.subscribe({
       next: () => {
@@ -213,7 +223,7 @@ export class EnrollmentsComponent implements OnInit {
           branchId: { eq: this._globalStateService.branch!.id },
           studentId: { eq: this._globalStateService.student!.id },
           cycleId: { eq: this._globalStateService.cycle!.id },
-          details: { iLike: `%${this.searchControl.value}%` },
+          details: { iLike: `%${this._debouncedSearchTerm()}%` },
         },
       };
 

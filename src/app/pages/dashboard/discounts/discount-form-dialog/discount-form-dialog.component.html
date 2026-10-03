@@ -1,10 +1,10 @@
-<h2 mat-dialog-title>{{ !!data?.id ? "Actualizar" : "Crear" }} descuento</h2>
+<h2 mat-dialog-title>{{ isEditing() ? "Actualizar" : "Crear" }} descuento</h2>
 <mat-dialog-content>
-  <form id="dataForm" [formGroup]="formGroup" (ngSubmit)="submit()">
+  <form id="dataForm" [formRoot]="discountForm" (submit)="submit()">
     <div class="flex flex-col gap-3">
       <mat-form-field>
         <mat-label>Tipo de descuento</mat-label>
-        <mat-select formControlName="type">
+        <mat-select [formField]="discountForm.type">
           @for (type of discountTypes; track $index) {
           <mat-option [value]="type.value">{{ type.label }}</mat-option>
           }
@@ -12,27 +12,36 @@
         <mat-hint
           >Seleccione si el descuento es monto fijo o porcentaje</mat-hint
         >
-        <mat-error>
-          {{ formTools.checkForErrorsIn(formGroup.get("type")) }}
-        </mat-error>
+        @if (discountForm.type().touched() && discountForm.type().invalid()) {
+          <mat-error>
+            {{ discountForm.type().errors()[0].message }}
+          </mat-error>
+        }
       </mat-form-field>
 
       <mat-form-field>
-        <mat-label> 
-            @if (this.formGroup.get("type")?.value === 'PERCENTAGE') {
-                Porcentaje
-            } @else {
-                Monto fijo
-            }    
-            de descuento
+        <mat-label>
+          @if (discountModel().type === 'PERCENTAGE') {
+            Porcentaje
+          } @else {
+            Monto fijo
+          }
+          de descuento
         </mat-label>
-        <input type="number" matInput placeholder="Ejemplo: 10" formControlName="value" />
+        <input
+          type="number"
+          matInput
+          placeholder="Ejemplo: 10"
+          [formField]="discountForm.value"
+        />
         <mat-hint
           >Ingrese el porcentaje ó cantidad de descuento (solo número)</mat-hint
         >
-        <mat-error>
-          {{ formTools.checkForErrorsIn(formGroup.get("value")) }}
-        </mat-error>
+        @if (discountForm.value().touched() && discountForm.value().invalid()) {
+          <mat-error>
+            {{ discountForm.value().errors()[0].message }}
+          </mat-error>
+        }
       </mat-form-field>
 
       <mat-form-field>
@@ -40,19 +49,21 @@
         <input
           matInput
           placeholder="Ej: Descuento por temporada"
-          formControlName="name"
+          [formField]="discountForm.name"
         />
         <mat-hint>Escriba un nombre descriptivo para el descuento</mat-hint>
-        <mat-error>
-          {{ formTools.checkForErrorsIn(formGroup.get("name")) }}
-        </mat-error>
+        @if (discountForm.name().touched() && discountForm.name().invalid()) {
+          <mat-error>
+            {{ discountForm.name().errors()[0].message }}
+          </mat-error>
+        }
       </mat-form-field>
     </div>
   </form>
 </mat-dialog-content>
 <mat-dialog-actions align="end">
-  <button mat-button mat-dialog-close [disabled]="loading()">Cancelar</button>
-  <button mat-button cdkFocusInitial form="dataForm" [disabled]="loading()">
-    {{ loading() ? "Guardando..." : "Guardar" }}
+  <button mat-button mat-dialog-close [disabled]="submitting()">Cancelar</button>
+  <button mat-button cdkFocusInitial form="dataForm" [disabled]="submitting()">
+    {{ submitting() ? "Guardando..." : "Guardar" }}
   </button>
 </mat-dialog-actions>

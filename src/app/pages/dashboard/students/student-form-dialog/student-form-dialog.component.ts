@@ -1,8 +1,16 @@
-import { Component, inject, OnInit, signal, ChangeDetectionStrategy } from '@angular/core';
-import { ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  linkedSignal,
+  OnInit,
+  signal,
+} from '@angular/core';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatButtonModule } from '@angular/material/button';
-import { MatCheckbox } from '@angular/material/checkbox';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import {
   MAT_DIALOG_DATA,
@@ -15,15 +23,23 @@ import { MatSelectModule } from '@angular/material/select';
 import { ImagePickerComponent } from '@components/image-picker/image-picker.component';
 import {
   CreateOneStudentGQL,
+  FetchStudentGQL,
   StudentPartsFragment,
   UpdateOneStudentGQL,
 } from '@graphql';
 import {
-  BranchToolsService,
-  FormToolsService,
-  StorageService,
-} from '@services';
-import { of, startWith, switchMap } from 'rxjs';
+  applyWhen,
+  form,
+  FormField,
+  FormRoot,
+  maxLength,
+  required,
+  validateAsync,
+} from '@angular/forms/signals';
+import { rxResource } from '@angular/core/rxjs-interop';
+import { BranchToolsService, StorageService } from '@services';
+import { firstValueFrom, switchMap } from 'rxjs';
+import { StudentFormFields } from '@app/types/students';
 
 @Component({
   selector: 'app-student-form-dialog',
@@ -31,21 +47,20 @@ import { of, startWith, switchMap } from 'rxjs';
     MatDialogModule,
     MatButtonModule,
     MatSelectModule,
-    MatCheckbox,
+    MatCheckboxModule,
     ImagePickerComponent,
     MatAutocompleteModule,
     MatInputModule,
     MatFormFieldModule,
     MatDatepickerModule,
-    ReactiveFormsModule,
+    FormField,
+    FormRoot,
   ],
   templateUrl: './student-form-dialog.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
 export class StudentFormDialogComponent implements OnInit {
-  public readonly formTools = inject(FormToolsService);
-
   public loading = signal(false);
   public data: StudentPartsFragment | null = inject(MAT_DIALOG_DATA);
   public readonly _storage = inject(StorageService);
@@ -53,176 +68,211 @@ export class StudentFormDialogComponent implements OnInit {
   public branchTools = inject(BranchToolsService);
   private readonly _createOneStudent = inject(CreateOneStudentGQL);
   private readonly _updateOneStudent = inject(UpdateOneStudentGQL);
+  private readonly _fetchStudentGQL = inject(FetchStudentGQL);
 
   private readonly _dialogRef = inject(
     MatDialogRef<StudentFormDialogComponent>
   );
 
-  private previusPicture = '';
+  private previousPicture = signal('');
 
-  public formGroup = this.formTools.builder.group({
-    picture: this.formTools.builder.control<File | string>('', {
-      nonNullable: true,
-    }),
-    firstname: this.formTools.builder.control<string>('', {
-      validators: [Validators.required, Validators.maxLength(32)],
-      nonNullable: true,
-    }),
-    lastname: this.formTools.builder.control<string>('', {
-      validators: [Validators.required, Validators.maxLength(32)],
-      nonNullable: true,
-    }),
-    dni: this.formTools.builder.control<string>('', {
-      validators: [Validators.required, Validators.maxLength(32)],
-      asyncValidators: [this.formTools.isDniStudentValid],
-      nonNullable: true,
-    }),
-    dateBirth: this.formTools.builder.control<string>(
-      new Date(2010, 1, 1, 0).toDateString(),
-      {
-        validators: [Validators.required],
-        nonNullable: true,
-      }
-    ),
-    active: this.formTools.builder.control<boolean>(true, {
-      nonNullable: true,
-    }),
-    branchIds: this.formTools.builder.control<string[]>([], {
-      nonNullable: true,
-    }),
+  public readonly isEditing = computed(() => !!this.data?.id);
+
+  private readonly _initialModel = computed<StudentFormFields>(() => ({
+    picture: this.data?.picture ?? '',
+    firstname: this.data?.firstname ?? '',
+    lastname: this.data?.lastname ?? '',
+    dni: this.data?.dni ?? '',
+    dateBirth:
+      this.data?.dateBirth ?? new Date(2010, 1, 1, 0).toISOString().slice(0, 10),
+    active: this.data?.active ?? true,
+    branchIds: this.data?.branchs.map((branch) => branch.id) ?? [],
+  }));
+
+  public readonly studentModel = linkedSignal<
+    StudentFormFields,
+    StudentFormFields
+  >({
+    source: this._initialModel,
+    computation: (initial) => ({ ...initial }),
   });
 
-  ngOnInit(): void {
-    if (!!this.data?.id) {
-      this.formGroup.patchValue({
-        picture: this.data.picture,
-        firstname: this.data.firstname,
-        lastname: this.data.lastname,
-        dateBirth: this.data.dateBirth,
-        dni: this.data.dni,
-        active: this.data.active,
-        branchIds: this.data.branchs.map((branch) => branch.id),
-      });
-      this.previusPicture = this.data.picture;
+  public readonly studentForm = form(this.studentModel, (schema) => {
+    required(schema.firstname, { message: 'Campo requerido' });
+    maxLength(schema.firstname, 32, { message: 'Máximo 32 caracteres' });
+    required(schema.lastname, { message: 'Campo requerido' });
+    maxLength(schema.lastname, 32, { message: 'Máximo 32 caracteres' });
+    required(schema.dni, { message: 'Campo requerido' });
+    maxLength(schema.dni, 32, { message: 'Máximo 32 caracteres' });
+    required(schema.dateBirth, { message: 'Campo requerido' });
+    required(schema.branchIds, { message: 'Seleccione al menos una sucursal' });
 
-      this.formGroup
-        .get('dni')
-        ?.valueChanges.pipe(startWith(this.data.dni))
-        .subscribe((value) => {
-          const dniControl = this.formGroup.get('dni');
-          if (value === this.data?.dni) {
-            dniControl?.clearAsyncValidators();
-          } else {
-            dniControl?.setAsyncValidators([this.formTools.isDniStudentValid]);
-          }
-          dniControl?.updateValueAndValidity({
-            onlySelf: true,
-            emitEvent: false,
-          });
-        });
-    }
+    // La imagen sólo es obligatoria al crear (no debe bloquear la
+    // edición de registros que no tienen imagen).
+    applyWhen(
+      schema,
+      ({ valueOf }) =>
+        !this.isEditing() &&
+        (!valueOf(schema.picture) || valueOf(schema.picture) === ''),
+      (schema) => {
+        required(schema.picture, { message: 'Seleccione una imagen' });
+      }
+    );
+
+    // Validación asíncrona del DNI: verifica que no exista otro
+    // estudiante con el mismo DNI/código en la base de datos.
+    validateAsync(schema.dni, {
+      params: ({ value }) => {
+        const current = value();
+        if (!current) return undefined;
+        if (current === this.data?.dni) return undefined;
+        return current;
+      },
+      debounce: 300,
+      factory: (params) =>
+        rxResource({
+          params,
+          stream: ({ params: term }) =>
+            this._fetchStudentGQL.fetch({
+              variables: {
+                limit: 5,
+                offset: 0,
+                filter: {
+                  or: [
+                    { code: { eq: term } },
+                    { dni: { eq: term } },
+                  ],
+                },
+              },
+              fetchPolicy: 'network-only',
+            }),
+        }),
+      onSuccess: (response) => {
+        if (response.error) {
+          return { kind: 'notAvailable', message: 'No se pudo verificar el DNI' };
+        }
+        const student = response.data?.students?.nodes?.find(
+          (value) => value?.id
+        );
+        return student
+          ? { kind: 'dniIsExists', message: 'El DNI ya existe en la base de datos' }
+          : null;
+      },
+      onError: () => ({
+        kind: 'notAvailable',
+        message: 'No se pudo verificar el DNI',
+      }),
+    });
+  });
+
+  // El checkbox se enlaza directamente mediante `[formField]="studentForm.active"`,
+  // que ya implementa `FormCheckboxControl` a través del field state interno.
+
+  constructor() {
+    effect(() => {
+      this._dialogRef.disableClose = this.loading();
+    });
+
+    effect(() => {
+      const data = this.data;
+      if (data?.picture) {
+        this.previousPicture.set(data.picture);
+      }
+    });
+  }
+
+  ngOnInit(): void {
+    this.branchTools.fetchAll();
   }
 
   public async submit(): Promise<void> {
-    if (this.formGroup.valid) {
-      this.loading.set(true);
+    if (this.studentForm().invalid()) {
+      return;
+    }
 
-      const values = this.formGroup.getRawValue();
+    const values = this.studentModel();
+    this.loading.set(true);
 
-      if (!!this.data?.id) {
-        this._update(values).subscribe({
-          next: (student) => {
-            this._dialogRef.close(student);
-          },
-          error: (err) => {
-            console.error('UPDATE STUDENT ERROR: ', err);
-          },
-          complete: () => {
-            this.loading.set(false);
-          },
-        });
-      } else {
-        this._save(values).subscribe({
-          next: (branch) => {
-            this._dialogRef.close(branch);
-          },
-          error: (err) => {
-            console.error('CREATE STUDENT ERROR: ', err);
-          },
-          complete: () => {
-            this.loading.set(false);
-          },
-        });
-      }
+    try {
+      const student = this.isEditing()
+        ? await this._update(values)
+        : await this._save(values);
+
+      this._dialogRef.close(student);
+    } catch (err) {
+      console.error(
+        this.isEditing()
+          ? 'UPDATE STUDENT ERROR: '
+          : 'CREATE STUDENT ERROR: ',
+        err
+      );
+    } finally {
+      this.loading.set(false);
     }
   }
 
-  private _update(values: FormValues) {
-    const withFile = values.picture instanceof File;
+  private async _update(values: StudentFormFields) {
+    const { picture, branchIds } = values;
+    const uploaded = await this._resolvePicture(picture);
 
-    const uploadPicture$ = withFile
-      ? this._storage
-          .delete(this.previusPicture)
-          .pipe(switchMap(() => this._storage.upload(values.picture as File)))
-      : of(this.previusPicture);
-
-    return uploadPicture$.pipe(
-      switchMap((picture) =>
-        this._updateOneStudent.mutate({
-          variables: {
-            id: this.data!.id,
-            update: {
-              picture,
-              firstname: values.firstname,
-              lastname: values.lastname,
-              dateBirth: values.dateBirth,
-              dni: values.dni,
-              active: values.active,
-              branchs: values.branchIds.map((branchId) => ({
-                id: branchId,
-              })),
-            },
+    const updated = await firstValueFrom(
+      this._updateOneStudent.mutate({
+        variables: {
+          id: this.data!.id,
+          update: {
+            picture: uploaded,
+            firstname: values.firstname,
+            lastname: values.lastname,
+            dateBirth: values.dateBirth,
+            dni: values.dni,
+            active: values.active,
+            branchs: branchIds.map((branchId) => ({ id: branchId })),
           },
-        })
-      )
+        },
+      })
     );
+
+    return updated.data?.updateOneStudent;
   }
 
-  private _save(values: FormValues) {
-    const withFile = values.picture instanceof File;
+  private async _save(values: StudentFormFields) {
+    const { picture, branchIds } = values;
 
-    const uploadPicture$ = withFile
-      ? this._storage.upload(values.picture as File)
-      : of('images/image-default.png');
+    if (!(picture instanceof File)) {
+      throw new Error('La imagen es requerida para crear un estudiante');
+    }
 
-    return uploadPicture$.pipe(
-      switchMap((picture) =>
-        this._createOneStudent.mutate({
-          variables: {
-            student: {
-              picture,
-              firstname: values.firstname,
-              lastname: values.lastname,
-              dateBirth: values.dateBirth,
-              dni: values.dni,
-              active: values.active,
-              branchs: values.branchIds.map((branchId) => ({
-                id: branchId,
-              })),
+    const created = await firstValueFrom(
+      this._storage.upload(picture).pipe(
+        switchMap((url) =>
+          this._createOneStudent.mutate({
+            variables: {
+              student: {
+                picture: url,
+                firstname: values.firstname,
+                lastname: values.lastname,
+                dateBirth: values.dateBirth,
+                dni: values.dni,
+                active: values.active,
+                branchs: branchIds.map((branchId) => ({ id: branchId })),
+              },
             },
-          },
-        })
-      )
-    );
+          })
+        )
+    ));
+
+    return created.data?.createOneStudent;
+  }
+
+  private async _resolvePicture(picture: File | string): Promise<string> {
+    if (picture instanceof File) {
+      return firstValueFrom(
+        this._storage.delete(this.previousPicture()).pipe(
+          switchMap(() => this._storage.upload(picture))
+        )
+      );
+    }
+
+    return picture;
   }
 }
-
-type FormValues = {
-  picture: File | string;
-  firstname: string;
-  lastname: string;
-  dni: string;
-  dateBirth: string;
-  active: boolean;
-  branchIds: string[];
-};

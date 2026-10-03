@@ -1,6 +1,6 @@
 <h2 mat-dialog-title>{{ !!data?.id ? "Actualizar" : "Crear" }} inscripción</h2>
 <mat-dialog-content>
-  <form id="dataForm" [formGroup]="formGroup" (ngSubmit)="submit()">
+  <form id="dataForm" [formRoot]="enrollmentForm" (submit)="submit()">
     <div class="flex flex-col gap-3">
       <mat-form-field class="w-full">
         <mat-label>Seleccione un nivel</mat-label>
@@ -8,18 +8,22 @@
           type="text"
           placeholder="Ej. Little Magicians, Wizards"
           matInput
-          formControlName="level"
+          [value]="levelSearchTerm()"
+          (input)="onLevelSearch($any($event.target).value)"
+          (blur)="enrollmentForm.level().markAsTouched()"
           [matAutocomplete]="autoLevels"
         />
         <mat-hint>Seleccione un nivel para la inscripción</mat-hint>
-        <mat-error>
-          {{ formTools.checkForErrorsIn(formGroup.get("level")) }}
-        </mat-error>
-        @if (formGroup.get("level")?.value) {
+        @if (enrollmentForm.level().touched() && enrollmentForm.level().invalid()) {
+          <mat-error>
+            {{ enrollmentForm.level().errors()[0].message }}
+          </mat-error>
+        }
+        @if (enrollmentModel().level) {
         <button
           mat-icon-button
           matSuffix
-          (click)="formGroup.get('level')?.setValue('')"
+          (click)="clearLevel()"
         >
           <mat-icon svgIcon="close" />
         </button>
@@ -27,6 +31,7 @@
         <mat-autocomplete
           #autoLevels="matAutocomplete"
           [displayWith]="levelTools.displayFn"
+          (optionSelected)="onLevelSelected($event.option.value)"
         >
           @for (level of levelTools.options(); track level.id) {
           <mat-option [value]="level">
@@ -42,18 +47,22 @@
           type="text"
           placeholder="Ej. Paquete 1, Nacional"
           matInput
-          formControlName="package"
+          [value]="packageSearchTerm()"
+          (input)="onPackageSearch($any($event.target).value)"
+          (blur)="enrollmentForm.package().markAsTouched()"
           [matAutocomplete]="autoStudents"
         />
         <mat-hint>Seleccione una lista de precios para la inscripción</mat-hint>
-        <mat-error>
-          {{ formTools.checkForErrorsIn(formGroup.get("package")) }}
-        </mat-error>
-        @if (formGroup.get("package")?.value) {
+        @if (enrollmentForm.package().touched() && enrollmentForm.package().invalid()) {
+          <mat-error>
+            {{ enrollmentForm.package().errors()[0].message }}
+          </mat-error>
+        }
+        @if (enrollmentModel().package) {
         <button
           mat-icon-button
           matSuffix
-          (click)="formGroup.get('package')?.setValue('')"
+          (click)="clearPackage()"
         >
           <mat-icon svgIcon="close" />
         </button>
@@ -61,19 +70,20 @@
         <mat-autocomplete
           #autoStudents="matAutocomplete"
           [displayWith]="packageTools.displayFn"
+          (optionSelected)="onPackageSelected($event.option.value)"
         >
-          @for (package of packageTools.options(); track package.id) {
-          <mat-option [value]="package">
-            <h4 mat-line>{{ package.name }}</h4>
-            @if (package.kind === 'HOURS') {
+          @for (pkg of packageTools.options(); track pkg.id) {
+          <mat-option [value]="pkg">
+            <h4 mat-line>{{ pkg.name }}</h4>
+            @if (pkg.kind === 'HOURS') {
             <p mat-line class="text-sm text-gray-500">
-              {{ package.quantity }} horas
+              {{ pkg.quantity }} horas
             </p>
-            } @else if (package.kind === 'QUANTITY') {
+            } @else if (pkg.kind === 'QUANTITY') {
             <p mat-line class="text-sm text-gray-500">
-              {{ package.quantity }} disciplinas
+              {{ pkg.quantity }} disciplina
             </p>
-            } @else if (package.kind === 'UNLIMITED') {
+            } @else if (pkg.kind === 'UNLIMITED') {
             <p mat-line class="text-sm text-gray-500">Ilimitado</p>
             }
           </mat-option>
@@ -84,15 +94,17 @@
       @if (!!data?.id) {
       <mat-form-field>
         <mat-label>Estado</mat-label>
-        <mat-select formControlName="state">
+        <mat-select [formField]="enrollmentForm.state">
           @for (state of enrollmentStates; track $index) {
           <mat-option [value]="state.value">{{ state.label }}</mat-option>
           }
         </mat-select>
         <mat-hint> Seleccione el estado de la inscripción </mat-hint>
-        <mat-error>
-          {{ formTools.checkForErrorsIn(formGroup.get("state")) }}
-        </mat-error>
+        @if (enrollmentForm.state().touched() && enrollmentForm.state().invalid()) {
+          <mat-error>
+            {{ enrollmentForm.state().errors()[0].message }}
+          </mat-error>
+        }
       </mat-form-field>
       }
 
@@ -101,12 +113,14 @@
         <input
           matInput
           placeholder="Ej: Introducción a la programación"
-          formControlName="details"
+          [formField]="enrollmentForm.details"
         />
         <mat-hint>Ingrese los detalles de la inscripción</mat-hint>
-        <mat-error>
-          {{ formTools.checkForErrorsIn(formGroup.get("details")) }}
-        </mat-error>
+        @if (enrollmentForm.details().touched() && enrollmentForm.details().invalid()) {
+          <mat-error>
+            {{ enrollmentForm.details().errors()[0].message }}
+          </mat-error>
+        }
       </mat-form-field>
     </div>
   </form>

@@ -29,6 +29,8 @@
       "@models": ["./src/app/models"],
       "@graphql": ["./src/app/graphql/generated.ts"],
       "@environment": ["./src/environments/environment.ts"],
+      "@app/types": ["./src/app/types/index.ts"],
+      "@app/types/*": ["./src/app/types/*"]
     }
   },
   "angularCompilerOptions": {

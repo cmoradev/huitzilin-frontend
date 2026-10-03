@@ -1,6 +1,12 @@
-import { CurrencyPipe, NgClass } from '@angular/common';
-import { Component, inject, signal, ViewChild, ChangeDetectionStrategy } from '@angular/core';
-import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import { CurrencyPipe } from '@angular/common';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  effect,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { MatCardModule } from '@angular/material/card';
 import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -14,7 +20,8 @@ import {
   GetDiscountsPageGQL,
 } from '@graphql';
 import { GlobalStateService } from '@services';
-import { debounceTime, merge, startWith } from 'rxjs';
+import { toObservable } from '@angular/core/rxjs-interop';
+import { debounceTime } from 'rxjs';
 import { DiscountFormDialogComponent } from './discount-form-dialog/discount-form-dialog.component';
 import { DiscountDeleteDialogComponent } from './discount-delete-dialog/discount-delete-dialog.component';
 import { MatButtonModule } from '@angular/material/button';
@@ -22,10 +29,8 @@ import { MatButtonModule } from '@angular/material/button';
 @Component({
   selector: 'app-discounts',
   imports: [
-    NgClass,
     MatCardModule,
     MatPaginatorModule,
-    ReactiveFormsModule,
     MatFormFieldModule,
     MatInputModule,
     MatTableModule,
@@ -38,8 +43,9 @@ import { MatButtonModule } from '@angular/material/button';
   styles: ``,
 })
 export class DiscountsComponent {
-  @ViewChild('paginator') public paginator!: MatPaginator;
-  public searchControl = new FormControl('');
+  public readonly paginator = viewChild.required<MatPaginator>('paginator');
+
+  public readonly searchTerm = signal('');
 
   public displayedColumns: string[] = ['name', 'actions'];
   public dataSource = new MatTableDataSource<DiscountPartsFragment>([]);
@@ -51,57 +57,26 @@ export class DiscountsComponent {
   private readonly _discountsPageGQL = inject(GetDiscountsPageGQL);
   private readonly _globalStateService = inject(GlobalStateService);
 
-  ngAfterViewInit(): void {
-    merge(
-      this.paginator.page,
-      this.searchControl.valueChanges,
-      this._globalStateService.branch$
-    )
-      .pipe(debounceTime(300), startWith({}))
-      .subscribe({
-        next: () => this.refresh(),
-      });
-  }
+  public readonly refreshTrigger = signal(0);
 
-  public openFormDialog(
-    value: DiscountPartsFragment | undefined = undefined
-  ): void {
-    const $dialog = this.dialog.open(DiscountFormDialogComponent, {
-      width: '32rem',
-      data: value,
-      disableClose: true,
-    });
+  private readonly _debouncedSearchTerm = signal('');
 
-    $dialog.afterClosed().subscribe({
-      next: (discount) => {
-        if (discount) this.refresh();
-      },
-    });
-  }
+  constructor() {
+    toObservable(this.searchTerm)
+      .pipe(debounceTime(300))
+      .subscribe((term) => this._debouncedSearchTerm.set(term));
 
-  public openDeleteDialog(value: DiscountPartsFragment): void {
-    const $dialog = this.dialog.open(DiscountDeleteDialogComponent, {
-      data: value,
-      width: '32rem',
-      disableClose: true,
-    });
+    effect(() => {
+      const paginator = this.paginator();
+      const filter = this._buildFilter(this._debouncedSearchTerm());
+      this.refreshTrigger();
 
-    $dialog.afterClosed().subscribe({
-      next: (discount) => {
-        if (discount) this.refresh();
-      },
-    });
-  }
+      if (!filter) {
+        return;
+      }
 
-  public refresh() {
-    if (this._globalStateService.branch?.id) {
-      const limit: number = this.paginator.pageSize;
-      const offset: number = this.paginator.pageIndex * limit;
-
-      const filter: DiscountFilter = {
-        name: { iLike: `%${this.searchControl.value}%` },
-        branchId: { eq: this._globalStateService.branch!.id },
-      };
+      const limit = paginator.pageSize;
+      const offset = paginator.pageIndex * limit;
 
       this._discountsPageGQL
         .watch({
@@ -123,6 +98,56 @@ export class DiscountsComponent {
             this.totalCount.set(totalCount);
           },
         });
+    });
+  }
+
+  private _buildFilter(term: string): DiscountFilter | null {
+    const branch = this._globalStateService.branch;
+    if (!branch?.id) {
+      return null;
     }
+
+    return {
+      name: { iLike: `%${term}%` },
+      branchId: { eq: branch.id },
+    };
+  }
+
+  public onSearchInput(event: Event): void {
+    this.searchTerm.set((event.target as HTMLInputElement).value);
+  }
+
+  public openFormDialog(
+    value: DiscountPartsFragment | undefined = undefined
+  ): void {
+    const $dialog = this.dialog.open(DiscountFormDialogComponent, {
+      width: '32rem',
+      data: value,
+      disableClose: true,
+    });
+
+    $dialog.afterClosed().subscribe({
+      next: (discount) => {
+        if (discount) this.refresh();
+      },
+    });
+  }
+
+  public openDeleteDialog(value: DiscountPartsFragment): void {
+    const $dialog = this.dialog.open(DiscountDeleteDialogComponent, {
+      width: '32rem',
+      data: value,
+      disableClose: true,
+    });
+
+    $dialog.afterClosed().subscribe({
+      next: (discount) => {
+        if (discount) this.refresh();
+      },
+    });
+  }
+
+  public refresh(): void {
+    this.refreshTrigger.update((v) => v + 1);
   }
 }

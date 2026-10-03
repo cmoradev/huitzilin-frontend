@@ -3,9 +3,12 @@
   @if (loadingPolicies()) {
   <mat-progress-bar mode="indeterminate"></mat-progress-bar>
   }
-  <mat-selection-list [formControl]="policiesFormControl">
+  <mat-selection-list>
     @for (policy of policies(); track policy.id) {
-    <mat-list-option [value]="policy.id">
+    <mat-list-option
+      [selected]="isSelected(policy.id)"
+      (click)="togglePolicy(policy.id)"
+    >
       <span matListItemTitle>{{ policy.name }}</span>
       <span matListItemLine>{{ policy.actions.length }} permisos</span>
     </mat-list-option>

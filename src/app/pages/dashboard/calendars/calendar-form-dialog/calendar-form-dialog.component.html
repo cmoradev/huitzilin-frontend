@@ -2,15 +2,22 @@
   {{ !!data?.id ? "Actualizar" : "Crear" }} programación de actividades
 </h2>
 <mat-dialog-content>
-  <form id="dataForm" [formGroup]="formGroup" (ngSubmit)="submit()">
+  <form id="dataForm" [formRoot]="periodForm" (submit)="submit()">
     <div class="flex flex-col gap-3">
       <mat-form-field>
         <mat-label>Nombre</mat-label>
-        <input matInput placeholder="Ej: Taekwondo" formControlName="name" />
+        <input
+          matInput
+          placeholder="Ej: Taekwondo"
+          [formField]="periodForm.name"
+          (input)="onNameInput($any($event.target).value)"
+        />
         <mat-hint>Ingrese el nombre de la disciplina</mat-hint>
-        <mat-error>
-          {{ formTools.checkForErrorsIn(formGroup.get("name")) }}
-        </mat-error>
+        @if (periodForm.name().touched() && periodForm.name().invalid()) {
+          <mat-error>
+            {{ periodForm.name().errors()[0].message }}
+          </mat-error>
+        }
       </mat-form-field>
 
       <mat-form-field>
@@ -19,9 +26,9 @@
           <input
             matStartDate
             placeholder="Fecha de inicio"
-            formControlName="start"
+            [formField]="periodForm.start"
           />
-          <input matEndDate placeholder="Fecha de fin" formControlName="end" />
+          <input matEndDate placeholder="Fecha de fin" [formField]="periodForm.end" />
         </mat-date-range-input>
         <mat-hint>Seleccione un rango de fechas</mat-hint>
         <mat-datepicker-toggle
@@ -29,25 +36,31 @@
           [for]="datePicker"
         ></mat-datepicker-toggle>
         <mat-date-range-picker #datePicker></mat-date-range-picker>
-        <mat-error>
-          {{ formTools.checkForErrorsIn(formGroup.get("start")) }}
-        </mat-error>
-        <mat-error>
-          {{ formTools.checkForErrorsIn(formGroup.get("end")) }}
-        </mat-error>
+        @if (periodForm.start().touched() && periodForm.start().invalid()) {
+          <mat-error>
+            {{ periodForm.start().errors()[0].message }}
+          </mat-error>
+        }
+        @if (periodForm.end().touched() && periodForm.end().invalid()) {
+          <mat-error>
+            {{ periodForm.end().errors()[0].message }}
+          </mat-error>
+        }
       </mat-form-field>
 
       <mat-form-field>
         <mat-label>Días con actividades</mat-label>
-        <mat-select formControlName="days" multiple>
+        <mat-select [formField]="periodForm.days" multiple>
           @for (day of days; track $index) {
           <mat-option [value]="day.value">{{ day.label }}</mat-option>
           }
         </mat-select>
         <mat-hint> Seleccione los días de la semana con actividades </mat-hint>
-        <mat-error>
-          {{ formTools.checkForErrorsIn(formGroup.get("days")) }}
-        </mat-error>
+        @if (periodForm.days().touched() && periodForm.days().invalid()) {
+          <mat-error>
+            {{ periodForm.days().errors()[0].message }}
+          </mat-error>
+        }
       </mat-form-field>
 
       <mat-form-field>
@@ -55,18 +68,18 @@
         <input
           matInput
           [matTimepicker]="timePicker1"
-          formControlName="firstHour"
-          [matTimepickerMin]="maxHour"
-          [matTimepickerMax]="minHour"
+          [formField]="periodForm.firstHour"
         />
         <mat-timepicker-toggle matIconSuffix [for]="timePicker1">
           <mat-icon matTimepickerToggleIcon>keyboard_arrow_down</mat-icon>
         </mat-timepicker-toggle>
         <mat-timepicker #timePicker1 interval="30min" />
         <mat-hint> Seleccione la hora de inicio de las actividades </mat-hint>
-        <mat-error>
-          {{ formTools.checkForErrorsIn(formGroup.get("firstHour")) }}
-        </mat-error>
+        @if (periodForm.firstHour().touched() && periodForm.firstHour().invalid()) {
+          <mat-error>
+            {{ periodForm.firstHour().errors()[0].message }}
+          </mat-error>
+        }
       </mat-form-field>
 
       <mat-form-field>
@@ -74,18 +87,18 @@
         <input
           matInput
           [matTimepicker]="timePicker2"
-          formControlName="lastHour"
-          [matTimepickerMin]="maxHour"
-          [matTimepickerMax]="minHour"
+          [formField]="periodForm.lastHour"
         />
         <mat-timepicker-toggle matIconSuffix [for]="timePicker2">
           <mat-icon matTimepickerToggleIcon>keyboard_arrow_down</mat-icon>
         </mat-timepicker-toggle>
         <mat-timepicker #timePicker2 interval="30min" />
         <mat-hint> Seleccione la hora de cierre de las actividades </mat-hint>
-        <mat-error>
-          {{ formTools.checkForErrorsIn(formGroup.get("lastHour")) }}
-        </mat-error>
+        @if (periodForm.lastHour().touched() && periodForm.lastHour().invalid()) {
+          <mat-error>
+            {{ periodForm.lastHour().errors()[0].message }}
+          </mat-error>
+        }
       </mat-form-field>
     </div>
   </form>

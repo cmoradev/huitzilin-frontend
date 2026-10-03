@@ -1,6 +1,11 @@
-import { NgClass } from '@angular/common';
-import { Component, inject, signal, ViewChild, ChangeDetectionStrategy } from '@angular/core';
-import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  effect,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatDialog } from '@angular/material/dialog';
@@ -15,14 +20,14 @@ import {
   PolicyFilter,
   PolicyPartsFragment,
 } from '@graphql';
-import { debounceTime, merge, startWith } from 'rxjs';
+import { toObservable } from '@angular/core/rxjs-interop';
+import { debounceTime } from 'rxjs';
 import { PolicyDeleteDialogComponent } from './policy-delete-dialog/policy-delete-dialog.component';
 import { PolicyFormDialogComponent } from './policy-form-dialog/policy-form-dialog.component';
 
 @Component({
   selector: 'app-policies',
   imports: [
-    NgClass,
     MatCardModule,
     MatIconModule,
     MatTableModule,
@@ -31,15 +36,15 @@ import { PolicyFormDialogComponent } from './policy-form-dialog/policy-form-dial
     MatFormFieldModule,
     MatInputModule,
     MatButtonModule,
-    ReactiveFormsModule,
   ],
   templateUrl: './policies.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
 export class PoliciesComponent {
-  @ViewChild('paginator') public paginator!: MatPaginator;
-  public searchControl = new FormControl('');
+  public readonly paginator = viewChild.required<MatPaginator>('paginator');
+
+  public readonly searchTerm = signal('');
 
   public displayedColumns: string[] = ['name', 'actions'];
   public dataSource = new MatTableDataSource<PolicyPartsFragment>([]);
@@ -50,23 +55,56 @@ export class PoliciesComponent {
   private readonly dialog = inject(MatDialog);
   private readonly _policiesPageGQL = inject(GetPoliciesPageGQL);
 
-  ngAfterViewInit(): void {
-    merge(this.paginator.page, this.searchControl.valueChanges)
-      .pipe(debounceTime(300), startWith({}))
-      .subscribe({
-        next: () => {
-          this.refresh();
-        },
-      });
+  private readonly _debouncedSearchTerm = signal('');
+
+  constructor() {
+    toObservable(this.searchTerm)
+      .pipe(debounceTime(300))
+      .subscribe((term) => this._debouncedSearchTerm.set(term));
+
+    effect(() => {
+      const paginator = this.paginator();
+      const filter = this._buildFilter(this._debouncedSearchTerm());
+
+      const limit = paginator.pageSize;
+      const offset = paginator.pageIndex * limit;
+
+      this._policiesPageGQL
+        .watch({
+          variables: { limit, offset, filter },
+          fetchPolicy: 'cache-and-network',
+          nextFetchPolicy: 'cache-and-network',
+          notifyOnNetworkStatusChange: true,
+        })
+        .valueChanges.subscribe({
+          next: ({ data, loading }) => {
+            const policies = data?.policies;
+            const nodes = (policies?.nodes ?? []) as PolicyPartsFragment[];
+            const totalCount = policies?.totalCount ?? 0;
+
+            this.dataSource.data = nodes;
+
+            this.loading.set(loading);
+            this.totalCount.set(totalCount);
+          },
+        });
+    });
   }
 
-  public refresh() {
-    const limit: number = this.paginator.pageSize;
-    const offset: number = this.paginator.pageIndex * limit;
+  private _buildFilter(term: string): PolicyFilter {
+    return { or: [{ name: { iLike: `%${term}%` } }] };
+  }
 
-    const filter: PolicyFilter = {
-      or: [{ name: { iLike: `%${this.searchControl.value}%` } }],
-    };
+  public onSearchInput(event: Event): void {
+    this.searchTerm.set((event.target as HTMLInputElement).value);
+  }
+
+  public refresh(): void {
+    const paginator = this.paginator();
+    const filter = this._buildFilter(this.searchTerm());
+
+    const limit = paginator.pageSize;
+    const offset = paginator.pageIndex * limit;
 
     this._policiesPageGQL
       .watch({

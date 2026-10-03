@@ -1,36 +1,29 @@
-import { NgClass } from '@angular/common';
-import { Component, inject, signal, ViewChild, ChangeDetectionStrategy } from '@angular/core';
-import { FormControl, ReactiveFormsModule } from '@angular/forms';
-import { MatButtonModule, MatIconButton } from '@angular/material/button';
 import {
-  MatCard,
-  MatCardContent,
-  MatCardHeader,
-  MatCardModule,
-  MatCardTitle,
-} from '@angular/material/card';
+  ChangeDetectionStrategy,
+  Component,
+  effect,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
+import { MatButtonModule } from '@angular/material/button';
+import { MatCardModule } from '@angular/material/card';
 import { MatDialog } from '@angular/material/dialog';
-import {
-  MatFormField,
-  MatFormFieldModule,
-  MatLabel,
-  MatPrefix,
-} from '@angular/material/form-field';
-import { MatIcon, MatIconModule } from '@angular/material/icon';
-import { MatInput, MatInputModule } from '@angular/material/input';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatIconModule } from '@angular/material/icon';
+import { MatInputModule } from '@angular/material/input';
 import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
-import { MatTooltip, MatTooltipModule } from '@angular/material/tooltip';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { CycleFilter, CyclePartsFragment, GetCyclesPageGQL } from '@graphql';
-import { debounceTime, merge, startWith } from 'rxjs';
+import { toObservable } from '@angular/core/rxjs-interop';
+import { debounceTime } from 'rxjs';
 import { CycleFormDialogComponent } from './cycle-form-dialog/cycle-form-dialog.component';
 import { CycleDeleteDialogComponent } from './cycle-delete-dialog/cycle-delete-dialog.component';
-import { GlobalStateService } from '@services';
 
 @Component({
   selector: 'app-cycles',
   imports: [
-    NgClass,
     MatCardModule,
     MatIconModule,
     MatFormFieldModule,
@@ -39,15 +32,15 @@ import { GlobalStateService } from '@services';
     MatTooltipModule,
     MatTableModule,
     MatPaginatorModule,
-    ReactiveFormsModule,
   ],
   templateUrl: './cycles.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
 export class CyclesComponent {
-  @ViewChild('paginator') public paginator!: MatPaginator;
-  public searchControl = new FormControl('');
+  public readonly paginator = viewChild.required<MatPaginator>('paginator');
+
+  public readonly searchTerm = signal('');
 
   public displayedColumns: string[] = ['name', 'actions'];
   public dataSource = new MatTableDataSource<CyclePartsFragment>([]);
@@ -58,17 +51,51 @@ export class CyclesComponent {
   private readonly dialog = inject(MatDialog);
   private readonly _cyclesPageGQL = inject(GetCyclesPageGQL);
 
-  ngAfterViewInit(): void {
-    merge(
-      this.paginator.page,
-      this.searchControl.valueChanges,
-    )
-      .pipe(debounceTime(300), startWith({}))
-      .subscribe({
-        next: () => {
-          this.refresh();
-        },
-      });
+  public readonly refreshTrigger = signal(0);
+
+  private readonly _debouncedSearchTerm = signal('');
+
+  constructor() {
+    toObservable(this.searchTerm)
+      .pipe(debounceTime(300))
+      .subscribe((term) => this._debouncedSearchTerm.set(term));
+
+    effect(() => {
+      const paginator = this.paginator();
+      const filter = this._buildFilter(this._debouncedSearchTerm());
+      this.refreshTrigger();
+
+      const limit = paginator.pageSize;
+      const offset = paginator.pageIndex * limit;
+
+      this._cyclesPageGQL
+        .watch({
+          variables: { limit, offset, filter },
+          fetchPolicy: 'cache-and-network',
+          nextFetchPolicy: 'cache-and-network',
+          notifyOnNetworkStatusChange: true,
+        })
+        .valueChanges.subscribe({
+          next: ({ data, loading }) => {
+            const cycles = data?.cycles;
+            const nodes = (cycles?.nodes ?? []) as CyclePartsFragment[];
+            const totalCount = cycles?.totalCount ?? 0;
+
+            this.dataSource.data = nodes;
+
+            this.loading.set(loading);
+            this.totalCount.set(totalCount);
+          },
+        });
+    });
+  }
+
+  private _buildFilter(term: string): CycleFilter {
+    return { name: { iLike: `%${term}%` } };
+  }
+
+  public onSearchInput(event: Event): void {
+    this.searchTerm.set((event.target as HTMLInputElement).value);
   }
 
   public openFormDialog(
@@ -101,32 +128,7 @@ export class CyclesComponent {
     });
   }
 
-  public refresh() {
-    const limit: number = this.paginator.pageSize;
-    const offset: number = this.paginator.pageIndex * limit;
-
-    const filter: CycleFilter = {
-      name: { iLike: `%${this.searchControl.value}%` },
-    };
-
-    this._cyclesPageGQL
-      .watch({
-        variables: { limit, offset, filter },
-        fetchPolicy: 'cache-and-network',
-        nextFetchPolicy: 'cache-and-network',
-        notifyOnNetworkStatusChange: true,
-      })
-      .valueChanges.subscribe({
-        next: ({ data, loading }) => {
-          const cycles = data?.cycles;
-          const nodes = (cycles?.nodes ?? []) as CyclePartsFragment[];
-          const totalCount = cycles?.totalCount ?? 0;
-
-          this.dataSource.data = nodes;
-
-          this.loading.set(loading);
-          this.totalCount.set(totalCount);
-        },
-      });
+  public refresh(): void {
+    this.refreshTrigger.update((v) => v + 1);
   }
 }

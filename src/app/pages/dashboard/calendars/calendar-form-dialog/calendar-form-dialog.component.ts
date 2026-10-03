@@ -1,5 +1,12 @@
-import { Component, computed, inject, OnInit, signal, ChangeDetectionStrategy } from '@angular/core';
-import { ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  linkedSignal,
+  signal,
+} from '@angular/core';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatTimepickerModule } from '@angular/material/timepicker';
 import {
@@ -15,13 +22,29 @@ import {
   UpdateOnePeriodGQL,
   PeriodPartsFragment,
 } from '@graphql';
-import { FormToolsService, GlobalStateService } from '@services';
-import { map, merge } from 'rxjs';
+import { GlobalStateService } from '@services';
+import { firstValueFrom, map } from 'rxjs';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
-import { startOfMonth, endOfMonth, format, setHours } from 'date-fns';
+import {
+  endOfMonth,
+  format,
+  startOfMonth,
+} from 'date-fns';
 import { daysOfWeek } from '@utils/contains';
 import { MatSelectModule } from '@angular/material/select';
+import {
+  form,
+  FormField,
+  FormRoot,
+  maxLength,
+  required,
+  validateTree,
+} from '@angular/forms/signals';
+import { PeriodFormFields } from '@app/types/periods';
+
+const formatMonthYear = (date: Date): string =>
+  format(date, 'MMMM yyyy').toUpperCase();
 
 @Component({
   selector: 'app-calendar-form-dialog',
@@ -32,17 +55,16 @@ import { MatSelectModule } from '@angular/material/select';
     MatButtonModule,
     MatFormFieldModule,
     MatSelectModule,
-    ReactiveFormsModule,
     MatDatepickerModule,
     MatTimepickerModule,
+    FormField,
+    FormRoot,
   ],
   templateUrl: './calendar-form-dialog.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
-export class CalendarFormDialogComponent implements OnInit {
-  public readonly formTools = inject(FormToolsService);
-
+export class CalendarFormDialogComponent {
   public loading = signal<boolean>(false);
   public data: PeriodPartsFragment | null = inject(MAT_DIALOG_DATA);
 
@@ -55,168 +77,142 @@ export class CalendarFormDialogComponent implements OnInit {
   );
 
   public days = daysOfWeek;
-  public minHour = computed(() => this._globalStateService.period?.firstHour || '08:00');
-  public maxHour = computed(() => this._globalStateService.period?.lastHour || '20:00');
+  public minHour = computed(
+    () => this._globalStateService.period?.firstHour || '08:00'
+  );
+  public maxHour = computed(
+    () => this._globalStateService.period?.lastHour || '20:00'
+  );
 
-  public formGroup = this.formTools.builder.group({
-    name: this.formTools.builder.control<string>(
-      format(new Date(), 'MMMM yyyy').toUpperCase(),
-      {
-        validators: [Validators.required, Validators.maxLength(32)],
-        nonNullable: true,
-      }
-    ),
-    days: this.formTools.builder.control<string[]>(['1', '2', '3', '4', '5'], {
-      validators: [Validators.required],
-      nonNullable: true,
-    }),
-    start: this.formTools.builder.control<Date>(startOfMonth(new Date()), {
-      validators: [Validators.required],
-      nonNullable: true,
-    }),
-    end: this.formTools.builder.control<Date>(endOfMonth(new Date()), {
-      validators: [Validators.required],
-      nonNullable: true,
-    }),
-    firstHour: this.formTools.builder.control<Date>(
-      new Date(2025, 5, 15, 10, 0),
-      {
-        validators: [Validators.required],
-        nonNullable: true,
-      }
-    ),
-    lastHour: this.formTools.builder.control<Date>(
-      new Date(2025, 5, 15, 18, 0),
-      {
-        validators: [Validators.required],
-        nonNullable: true,
-      }
-    ),
+  public readonly isEditing = computed(() => !!this.data?.id);
+
+  private readonly _initialModel = computed<PeriodFormFields>(() => ({
+    name: this.data?.name ?? formatMonthYear(new Date()),
+    days: this.data?.days.split(',') ?? ['1', '2', '3', '4', '5'],
+    start: this.data?.start ?? startOfMonth(new Date()).toISOString(),
+    end: this.data?.end ?? endOfMonth(new Date()).toISOString(),
+    firstHour: this.data?.firstHour ?? '10:00',
+    lastHour: this.data?.lastHour ?? '18:00',
+  }));
+
+  public readonly periodModel = linkedSignal<PeriodFormFields, PeriodFormFields>({
+    source: this._initialModel,
+    computation: (initial) => ({ ...initial }),
   });
 
-  ngOnInit(): void {
-    if (!!this.data?.id) {
-      this.formGroup.patchValue({
-        name: this.data.name,
-        days: this.data.days.split(','),
-        start: new Date(`${this.data.start}T12:00:00`),
-        end: new Date(`${this.data.end}T12:00:00`),
-        firstHour: new Date(`2025-06-15T${this.data.firstHour}`),
-        lastHour: new Date(`2025-06-15T${this.data.lastHour}`),
-      });
-    }
+  public readonly periodForm = form(this.periodModel, (schema) => {
+    required(schema.name, { message: 'Campo requerido' });
+    maxLength(schema.name, 32, { message: 'Máximo 32 caracteres' });
+    required(schema.days, { message: 'Seleccione al menos un día' });
+    required(schema.start, { message: 'Seleccione una fecha de inicio' });
+    required(schema.end, { message: 'Seleccione una fecha de fin' });
+    required(schema.firstHour, { message: 'Seleccione la hora de inicio' });
+    required(schema.lastHour, { message: 'Seleccione la hora de cierre' });
 
-    merge(
-      this.formGroup.get('start')!.valueChanges,
-      this.formGroup.get('end')!.valueChanges
-    ).subscribe({
-      next: () => {
-        let name = '';
+    validateTree(schema, ({ valueOf }) => {
+      const start = valueOf(schema.start);
+      const end = valueOf(schema.end);
+      if (start && end && new Date(start) >= new Date(end)) {
+        return {
+          kind: 'endDateInvalid',
+          message:
+            'La fecha de finalización debe ser mayor a la fecha de inicio',
+          fieldTree: this.periodForm.end,
+        };
+      }
+      return null;
+    });
+  });
 
-        if (!!this.formGroup.get('start')?.value) {
-          const start = this.formGroup.get('start')!.value;
-          const startName = format(start, 'MMMM yyyy').toUpperCase();
-          name = startName;
-        }
+  private readonly _nameEdited = signal(false);
 
-        if (!!this.formGroup.get('end')?.value) {
-          const end = this.formGroup.get('end')!.value;
-          const endName = format(end, 'MMMM yyyy').toUpperCase();
-          if (name !== endName) {
-            name += ` - ${endName}`;
-          }
-        }
-        this.formGroup.patchValue({ name }, { emitEvent: false });
-      },
+  constructor() {
+    effect(() => {
+      const start = this.periodModel().start;
+      const end = this.periodModel().end;
+
+      if (!this._nameEdited() && start && end) {
+        const startName = formatMonthYear(new Date(start));
+        const endName = formatMonthYear(new Date(end));
+        const composed = startName === endName ? startName : `${startName} - ${endName}`;
+
+        this.periodModel.update((m) => ({ ...m, name: composed }));
+      }
+    });
+
+    effect(() => {
+      this._dialogRef.disableClose = this.loading();
     });
   }
 
+  public onNameInput(value: string): void {
+    this._nameEdited.set(true);
+    this.periodForm.name().value.set(value);
+  }
+
   public async submit(): Promise<void> {
-    if (this.formGroup.valid) {
-      const values = this.formGroup.getRawValue();
+    if (this.periodForm().invalid()) {
+      return;
+    }
 
-      this.loading.set(true);
+    const values = this.periodModel();
+    this.loading.set(true);
 
-      if (!!this.data?.id) {
-        this._update(values).subscribe({
-          next: (period) => {
-            this._dialogRef.close(period);
-            this._snackBar.open('Se ha actualizado correctamente', 'Cerrar', {
-              duration: 1000,
-              horizontalPosition: 'center',
-              verticalPosition: 'bottom',
-            });
-          },
-          error: (err) => {
-            console.error('UPDATE PERIOD ERROR: ', err);
-          },
-          complete: () => {
-            this.loading.set(false);
-          },
+    try {
+      if (this.isEditing()) {
+        const updated = await firstValueFrom(
+          this._updateOnePeriod.mutate({
+            variables: {
+              id: this.data!.id,
+              update: this._buildPayload(values),
+            },
+          })
+        );
+
+        this._dialogRef.close(updated.data?.updateOnePeriod);
+        this._snackBar.open('Se ha actualizado correctamente', 'Cerrar', {
+          duration: 1000,
+          horizontalPosition: 'center',
+          verticalPosition: 'bottom',
         });
       } else if (this._globalStateService.branch?.id) {
-        this._save(values).subscribe({
-          next: (cycle) => {
-            this._dialogRef.close(cycle);
-            this._snackBar.open('Se ha creado correctamente', 'Cerrar', {
-              duration: 1000,
-              horizontalPosition: 'center',
-              verticalPosition: 'bottom',
-            });
-          },
-          error: (err) => {
-            console.error('CREATE PERIOD ERROR: ', err);
-          },
-          complete: () => {
-            this.loading.set(false);
-          },
+        const created = await firstValueFrom(
+          this._createOnePeriod.mutate({
+            variables: {
+              period: {
+                ...this._buildPayload(values),
+                branchId: this._globalStateService.branch!.id,
+                order: 0,
+              },
+            },
+          })
+        );
+
+        this._dialogRef.close(created.data?.createOnePeriod);
+        this._snackBar.open('Se ha creado correctamente', 'Cerrar', {
+          duration: 1000,
+          horizontalPosition: 'center',
+          verticalPosition: 'bottom',
         });
       }
+    } catch (err) {
+      console.error(
+        this.isEditing() ? 'UPDATE PERIOD ERROR: ' : 'CREATE PERIOD ERROR: ',
+        err
+      );
+    } finally {
+      this.loading.set(false);
     }
   }
 
-  private _update(values: FormValues) {
-    return this._updateOnePeriod
-      .mutate({
-        variables: {
-          id: this.data!.id,
-          update: {
-            name: values.name,
-            days: values.days.join(','),
-            start: values.start.toISOString(),
-            end: values.end.toISOString(),
-            firstHour: values.firstHour.toTimeString().slice(0, 5),
-            lastHour: values.lastHour.toTimeString().slice(0, 5),
-          },
-        },
-      })
-      .pipe(map((value) => value.data?.updateOnePeriod));
-  }
-
-  private _save(values: FormValues) {
-    return this._createOnePeriod
-      .mutate({
-        variables: {
-          period: {
-            name: values.name,
-            days: values.days.join(','),
-            start: values.start.toISOString(),
-            end: values.end.toISOString(),
-            firstHour: values.firstHour.toTimeString().slice(0, 5),
-            lastHour: values.lastHour.toTimeString().slice(0, 5),
-            branchId: this._globalStateService.branch!.id,
-            order: 0,
-          },
-        },
-      })
-      .pipe(map((value) => value.data?.createOnePeriod));
+  private _buildPayload(values: PeriodFormFields) {
+    return {
+      name: values.name,
+      days: values.days.join(','),
+      start: new Date(values.start).toISOString(),
+      end: new Date(values.end).toISOString(),
+      firstHour: values.firstHour,
+      lastHour: values.lastHour,
+    };
   }
 }
-type FormValues = {
-  name: string;
-  days: string[];
-  start: Date;
-  end: Date;
-  firstHour: Date;
-  lastHour: Date;
-};

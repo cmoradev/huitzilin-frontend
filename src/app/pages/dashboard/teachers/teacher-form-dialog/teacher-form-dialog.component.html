@@ -1,32 +1,49 @@
 <h2 mat-dialog-title>{{ !!data?.id ? "Actualizar" : "Crear" }} docente</h2>
 <mat-dialog-content>
-  <form id="dataForm" [formGroup]="formGroup" (ngSubmit)="submit()">
+  <form id="dataForm" [formRoot]="teacherForm" (submit)="submit()">
     <div class="flex flex-col gap-3">
-      <app-image-picker formControlName="picture"></app-image-picker>
+      <app-image-picker [formField]="teacherForm.picture"></app-image-picker>
+      @if (teacherForm.picture().touched() && teacherForm.picture().invalid()) {
+        <mat-error class="text-red-500 text-sm">
+          {{ teacherForm.picture().errors()[0].message }}
+        </mat-error>
+      }
 
       <div class="grid grid-cols-2 gap-3">
         <mat-form-field>
           <mat-label>Nombre</mat-label>
-          <input matInput placeholder="Ej: Juan" formControlName="firstname" />
+          <input
+            matInput
+            placeholder="Ej: Juan"
+            [formField]="teacherForm.firstname"
+          />
           <mat-hint>Ingrese el nombre</mat-hint>
-          <mat-error>
-            {{ formTools.checkForErrorsIn(formGroup.get("firstname")) }}
-          </mat-error>
+          @if (teacherForm.firstname().touched() && teacherForm.firstname().invalid()) {
+            <mat-error>
+              {{ teacherForm.firstname().errors()[0].message }}
+            </mat-error>
+          }
         </mat-form-field>
 
         <mat-form-field>
           <mat-label>Apellido</mat-label>
-          <input matInput placeholder="Ej: Pérez" formControlName="lastname" />
+          <input
+            matInput
+            placeholder="Ej: Pérez"
+            [formField]="teacherForm.lastname"
+          />
           <mat-hint>Ingrese el apellido</mat-hint>
-          <mat-error>
-            {{ formTools.checkForErrorsIn(formGroup.get("lastname")) }}
-          </mat-error>
+          @if (teacherForm.lastname().touched() && teacherForm.lastname().invalid()) {
+            <mat-error>
+              {{ teacherForm.lastname().errors()[0].message }}
+            </mat-error>
+          }
         </mat-form-field>
       </div>
 
       <mat-form-field class="w-full">
         <mat-label>Sucursal</mat-label>
-        <mat-select formControlName="branchIds" multiple>
+        <mat-select [formField]="teacherForm.branchIds" multiple>
           @for (branch of branchTools.options(); track $index) {
           <mat-option [value]="branch.id">
             <div class="flex items-center gap-2">
@@ -36,7 +53,12 @@
           </mat-option>
           }
         </mat-select>
-        <mat-hint> Seleccione las sucursales </mat-hint>
+        <mat-hint>Seleccione las sucursales</mat-hint>
+        @if (teacherForm.branchIds().touched() && teacherForm.branchIds().invalid()) {
+          <mat-error>
+            {{ teacherForm.branchIds().errors()[0].message }}
+          </mat-error>
+        }
       </mat-form-field>
     </div>
   </form>

@@ -1,5 +1,12 @@
-import { Component, inject, OnInit, signal, ChangeDetectionStrategy } from '@angular/core';
-import { ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  linkedSignal,
+  signal,
+} from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import {
   MAT_DIALOG_DATA,
@@ -14,8 +21,17 @@ import {
   UpdateOnePackageGQL,
   PackageKind,
 } from '@graphql';
-import { FormToolsService, GlobalStateService } from '@services';
-import { map } from 'rxjs';
+import { GlobalStateService } from '@services';
+import {
+  form,
+  FormField,
+  FormRoot,
+  maxLength,
+  minLength,
+  required,
+} from '@angular/forms/signals';
+import { firstValueFrom } from 'rxjs';
+import { ActivityFormFields } from '@app/types/enrollments';
 
 @Component({
   selector: 'app-activity-form-dialog',
@@ -25,24 +41,15 @@ import { map } from 'rxjs';
     MatFormField,
     MatFormFieldModule,
     MatInputModule,
-    ReactiveFormsModule,
+    FormField,
+    FormRoot,
   ],
   templateUrl: './activity-form-dialog.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
-export class ActivityFormDialogComponent implements OnInit {
-  public readonly formTools = inject(FormToolsService);
-
-  public loading = signal(false);
-  public data: PackagePartsFragment | null = inject(MAT_DIALOG_DATA);
-
-  public formGroup = this.formTools.builder.group({
-    name: this.formTools.builder.control('', {
-      validators: [Validators.required,Validators.minLength(3),Validators.maxLength(32)],
-      nonNullable: true,
-    }),
-  });
+export class ActivityFormDialogComponent {
+  public readonly data: PackagePartsFragment | null = inject(MAT_DIALOG_DATA);
 
   private readonly _globalStateService = inject(GlobalStateService);
   private readonly _createOnePackage = inject(CreateOnePackageGQL);
@@ -52,74 +59,77 @@ export class ActivityFormDialogComponent implements OnInit {
     MatDialogRef<ActivityFormDialogComponent>
   );
 
-  ngOnInit(): void {
-    if (!!this.data?.id) {
-      this.formGroup.patchValue({
-        name: this.data.name,
-      });
-    }
+  public readonly isEditing = computed(() => !!this.data?.id);
+
+  private readonly _initialModel = computed<ActivityFormFields>(() => ({
+    name: this.data?.name ?? '',
+  }));
+
+  public readonly activityModel = linkedSignal<ActivityFormFields, ActivityFormFields>({
+    source: this._initialModel,
+    computation: (initial) => ({ ...initial }),
+  });
+
+  public readonly activityForm = form(this.activityModel, (schema) => {
+    required(schema.name, { message: 'Campo requerido' });
+    minLength(schema.name, 3, { message: 'Mínimo 3 caracteres' });
+    maxLength(schema.name, 32, { message: 'Máximo 32 caracteres' });
+  });
+
+  public readonly submitting = signal(false);
+
+  constructor() {
+    effect(() => {
+      this._dialogRef.disableClose = this.submitting();
+    });
   }
 
   public async submit(): Promise<void> {
-    if (this.formGroup.valid) {
-      this.loading.set(true);
+    if (this.activityForm().invalid()) {
+      return;
+    }
 
-      const values = this.formGroup.getRawValue() as any;
+    const values = this.activityModel();
+    this.submitting.set(true);
 
-      if (!!this.data?.id) {
-        this._update(values).subscribe({
-          next: (branch) => {
-            this._dialogRef.close(branch);
-          },
-          error: (err) => {
-            console.error('UPDATE PACKAGE ERROR: ', err);
-          },
-          complete: () => {
-            this.loading.set(false);
-          },
-        });
-      } else if (this._globalStateService.branch!.id) {
-        this._save(values).subscribe({
-          next: (branch) => {
-            this._dialogRef.close(branch);
-          },
-          error: (err) => {
-            console.error('CREATE PACKAGE ERROR: ', err);
-          },
-          complete: () => {
-            this.loading.set(false);
-          },
-        });
+    try {
+      if (this.isEditing()) {
+        const updated = await firstValueFrom(
+          this._updateOnePackage.mutate({
+            variables: {
+              id: this.data!.id,
+              update: { ...this._withDefaults(values) } as any,
+            },
+          })
+        );
+
+        this._dialogRef.close(updated.data?.updateOnePackage);
+      } else if (this._globalStateService.branch?.id) {
+        const created = await firstValueFrom(
+          this._createOnePackage.mutate({
+            variables: {
+              package: {
+                ...this._withDefaults(values),
+                branchId: this._globalStateService.branch!.id,
+                order: 1,
+              },
+            },
+          })
+        );
+
+        this._dialogRef.close(created.data?.createOnePackage);
       }
+    } catch (err) {
+      console.error(
+        this.isEditing() ? 'UPDATE PACKAGE ERROR: ' : 'CREATE PACKAGE ERROR: ',
+        err
+      );
+    } finally {
+      this.submitting.set(false);
     }
   }
 
-  private _update(values: FormValues) {
-    return this._updateOnePackage
-      .mutate({
-        variables: {
-          id: this.data!.id,
-          update: { ...this._withDefaults(values) } as any,
-        },
-      })
-      .pipe(map((value) => value.data?.updateOnePackage));
-  }
-
-  private _save(values: FormValues) {
-    return this._createOnePackage
-      .mutate({
-        variables: {
-          package: {
-            ...this._withDefaults(values),
-            branchId: this._globalStateService.branch!.id,
-            order: 1,
-          },
-        },
-      })
-      .pipe(map((value) => value.data?.createOnePackage));
-  }
-
-  private _withDefaults(values: FormValues) {
+  private _withDefaults(values: ActivityFormFields) {
     return {
       name: values.name,
       withTax: false,
@@ -128,7 +138,3 @@ export class ActivityFormDialogComponent implements OnInit {
     };
   }
 }
-
-type FormValues = {
-  name: string;
-};

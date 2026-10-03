@@ -1,6 +1,12 @@
-import { NgClass } from '@angular/common';
-import { Component, inject, signal, ViewChild, ChangeDetectionStrategy } from '@angular/core';
-import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import {
   CdkDragDrop,
@@ -16,6 +22,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { toObservable } from '@angular/core/rxjs-interop';
 import {
   GetLevelsPageGQL,
   LevelFilter,
@@ -24,14 +31,13 @@ import {
   SetOrderLevelsGQL,
 } from '@graphql';
 import { GlobalStateService } from '@services';
-import { debounceTime, merge, startWith } from 'rxjs';
+import { debounceTime } from 'rxjs';
 import { LevelDeleteDialogComponent } from './level-delete-dialog/level-delete-dialog.component';
 import { LevelFormDialogComponent } from './level-form-dialog/level-form-dialog.component';
 
 @Component({
   selector: 'app-levels',
   imports: [
-    NgClass,
     MatCardModule,
     MatFormFieldModule,
     MatInputModule,
@@ -40,7 +46,6 @@ import { LevelFormDialogComponent } from './level-form-dialog/level-form-dialog.
     MatTooltipModule,
     MatTableModule,
     MatPaginatorModule,
-    ReactiveFormsModule,
     DragDropModule,
   ],
   templateUrl: './levels.component.html',
@@ -48,8 +53,9 @@ import { LevelFormDialogComponent } from './level-form-dialog/level-form-dialog.
   styleUrl: './levels.component.scss',
 })
 export class LevelsComponent {
-  @ViewChild('paginator') public paginator!: MatPaginator;
-  public searchControl = new FormControl('');
+  public readonly paginator = viewChild.required<MatPaginator>('paginator');
+
+  public readonly searchTerm = signal('');
 
   public displayedColumns: string[] = ['name', 'actions'];
   public dataSource = new MatTableDataSource<LevelPartsFragment>([]);
@@ -64,18 +70,88 @@ export class LevelsComponent {
   private readonly _levelsPageGQL = inject(GetLevelsPageGQL);
   private readonly _globalStateService = inject(GlobalStateService);
 
-  ngAfterViewInit(): void {
-    merge(
-      this.paginator.page,
-      this.searchControl.valueChanges,
-      this._globalStateService.branch$
-    )
-      .pipe(debounceTime(300), startWith({}))
-      .subscribe({
-        next: () => {
-          this.refresh();
-        },
-      });
+  public readonly refreshTrigger = signal(0);
+
+  public readonly filter = computed<LevelFilter | null>(() => {
+    const branch = this._globalStateService.branch;
+    if (!branch?.id) {
+      return null;
+    }
+
+    const term = this.searchTerm();
+    return {
+      branchId: { eq: branch.id },
+      or: [
+        { name: { iLike: `%${term}%` } },
+        { abbreviation: { iLike: `%${term}%` } },
+      ],
+    };
+  });
+
+  /**
+   * Stream de búsqueda con debounce, expuesto como signal para integrarse
+   * con el resto del flujo reactivo.
+   */
+  private readonly _debouncedSearchTerm = signal('');
+
+  constructor() {
+    // Debounce del término desde el input nativo.
+    toObservable(this.searchTerm)
+      .pipe(debounceTime(300))
+      .subscribe((term) => this._debouncedSearchTerm.set(term));
+
+    // Refresca la lista cuando cambian los criterios reactivos.
+    effect(() => {
+      const paginator = this.paginator();
+      const filter = this._buildFilter(this._debouncedSearchTerm());
+      this.refreshTrigger();
+
+      if (!filter) {
+        return;
+      }
+
+      const limit = paginator.pageSize;
+      const offset = paginator.pageIndex * limit;
+
+      this._levelsPageGQL
+        .watch({
+          variables: { limit, offset, filter },
+          fetchPolicy: 'cache-and-network',
+          nextFetchPolicy: 'cache-and-network',
+          notifyOnNetworkStatusChange: true,
+        })
+        .valueChanges.subscribe({
+          next: ({ data, loading }) => {
+            const levels = data?.levels;
+            const nodes = (levels?.nodes ?? []) as LevelPartsFragment[];
+            const totalCount = levels?.totalCount ?? 0;
+
+            this.dataSource.data = nodes;
+
+            this.loading.set(loading);
+            this.totalCount.set(totalCount);
+          },
+        });
+    });
+  }
+
+  private _buildFilter(term: string): LevelFilter | null {
+    const branch = this._globalStateService.branch;
+    if (!branch?.id) {
+      return null;
+    }
+
+    return {
+      branchId: { eq: branch.id },
+      or: [
+        { name: { iLike: `%${term}%` } },
+        { abbreviation: { iLike: `%${term}%` } },
+      ],
+    };
+  }
+
+  public onSearchInput(event: Event): void {
+    this.searchTerm.set((event.target as HTMLInputElement).value);
   }
 
   public openFormDialog(
@@ -108,42 +184,11 @@ export class LevelsComponent {
     });
   }
 
-  public refresh() {
-    const limit: number = this.paginator.pageSize;
-    const offset: number = this.paginator.pageIndex * limit;
-
-    const filter: LevelFilter = {
-      branchId: { eq: this._globalStateService.branch!.id },
-      or: [
-        {
-          name: { iLike: `%${this.searchControl.value}%` },
-          abbreviation: { iLike: `%${this.searchControl.value}%` },
-        },
-      ],
-    };
-
-    this._levelsPageGQL
-      .watch({
-        variables: { limit, offset, filter },
-        fetchPolicy: 'cache-and-network',
-        nextFetchPolicy: 'cache-and-network',
-        notifyOnNetworkStatusChange: true,
-      })
-      .valueChanges.subscribe({
-        next: ({ data, loading }) => {
-          const levels = data?.levels;
-          const nodes = (levels?.nodes ?? []) as LevelPartsFragment[];
-          const totalCount = levels?.totalCount ?? 0;
-
-          this.dataSource.data = nodes;
-
-          this.loading.set(loading);
-          this.totalCount.set(totalCount);
-        },
-      });
+  public refresh(): void {
+    this.refreshTrigger.update((v) => v + 1);
   }
 
-  public dropLevel(event: CdkDragDrop<LevelPartsFragment[]>) {
+  public dropLevel(event: CdkDragDrop<LevelPartsFragment[]>): void {
     const values = [...this.dataSource.data];
     moveItemInArray(values, event.previousIndex, event.currentIndex);
     this.dataSource.data = values;
@@ -152,8 +197,9 @@ export class LevelsComponent {
   }
 
   private updateOrderLevels(): void {
-    const limit: number = this.paginator.pageSize;
-    const offset: number = this.paginator.pageIndex * limit;
+    const paginator = this.paginator();
+    const limit = paginator.pageSize;
+    const offset = paginator.pageIndex * limit;
 
     const payload: SetOrderInput[] = this.dataSource.data.map(
       (item, index) => ({

@@ -2,7 +2,7 @@
   {{ !!data?.id ? "Actualizar" : "Crear" }} ciclo escolar
 </h2>
 <mat-dialog-content>
-  <form id="dataForm" [formGroup]="formGroup" (ngSubmit)="submit()">
+  <form id="dataForm" [formRoot]="cycleForm" (submit)="submit()">
     <div class="flex flex-col gap-3">
       <mat-form-field>
         <mat-label> Fecha de inicio y fin del ciclo escolar </mat-label>
@@ -10,9 +10,9 @@
           <input
             matStartDate
             placeholder="Fecha de inicio"
-            formControlName="start"
+            [formField]="cycleForm.start"
           />
-          <input matEndDate placeholder="Fecha de fin" formControlName="end" />
+          <input matEndDate placeholder="Fecha de fin" [formField]="cycleForm.end" />
         </mat-date-range-input>
         <mat-hint>Seleccione un rango de fechas</mat-hint>
         <mat-datepicker-toggle
@@ -20,12 +20,16 @@
           [for]="picker"
         ></mat-datepicker-toggle>
         <mat-date-range-picker #picker></mat-date-range-picker>
-        <mat-error>
-          {{ formTools.checkForErrorsIn(formGroup.get("start")) }}
-        </mat-error>
-        <mat-error>
-          {{ formTools.checkForErrorsIn(formGroup.get("end")) }}
-        </mat-error>
+        @if (cycleForm.start().touched() && cycleForm.start().invalid()) {
+          <mat-error>
+            {{ cycleForm.start().errors()[0].message }}
+          </mat-error>
+        }
+        @if (cycleForm.end().touched() && cycleForm.end().invalid()) {
+          <mat-error>
+            {{ cycleForm.end().errors()[0].message }}
+          </mat-error>
+        }
       </mat-form-field>
 
       <mat-form-field>
@@ -33,12 +37,14 @@
         <input
           matInput
           placeholder="Ej: Ciclo 2023-2024"
-          formControlName="name"
+          [formField]="cycleForm.name"
         />
         <mat-hint>Ingrese el nombre del ciclo escolar</mat-hint>
-        <mat-error>
-          {{ formTools.checkForErrorsIn(formGroup.get("name")) }}
-        </mat-error>
+        @if (cycleForm.name().touched() && cycleForm.name().invalid()) {
+          <mat-error>
+            {{ cycleForm.name().errors()[0].message }}
+          </mat-error>
+        }
       </mat-form-field>
     </div>
   </form>

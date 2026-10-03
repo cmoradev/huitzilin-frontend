@@ -1,18 +1,23 @@
-<h2 mat-dialog-title>{{ !!data?.id ? "Actualizar" : "Crear" }} nivel</h2>
+<h2 mat-dialog-title>{{ isEditing() ? "Actualizar" : "Crear" }} nivel</h2>
 <mat-dialog-content>
-  <form id="dataForm" [formGroup]="formGroup" (ngSubmit)="submit()">
+  <form id="dataForm" [formRoot]="levelForm" (submit)="submit()">
     <div class="flex flex-col gap-3">
       <mat-form-field>
         <mat-label>Abreviatura</mat-label>
         <input
           matInput
           placeholder="Ej: WK, AQ"
-          formControlName="abbreviation"
+          [formField]="levelForm.abbreviation"
         />
         <mat-hint>Ingrese la abreviatura del nivel</mat-hint>
-        <mat-error>
-          {{ formTools.checkForErrorsIn(formGroup.get("abbreviation")) }}
-        </mat-error>
+        @if (
+          levelForm.abbreviation().touched() &&
+          levelForm.abbreviation().invalid()
+        ) {
+          <mat-error>
+            {{ levelForm.abbreviation().errors()[0].message }}
+          </mat-error>
+        }
       </mat-form-field>
 
       <mat-form-field>
@@ -20,19 +25,26 @@
         <input
           matInput
           placeholder="Ej: Warlocks, Alchemists"
-          formControlName="name"
+          [formField]="levelForm.name"
         />
         <mat-hint>Ingrese el nombre del nivel de estudio</mat-hint>
-        <mat-error>
-          {{ formTools.checkForErrorsIn(formGroup.get("name")) }}
-        </mat-error>
+        @if (levelForm.name().touched() && levelForm.name().invalid()) {
+          <mat-error>
+            {{ levelForm.name().errors()[0].message }}
+          </mat-error>
+        }
       </mat-form-field>
     </div>
   </form>
 </mat-dialog-content>
 <mat-dialog-actions align="end">
-  <button mat-button mat-dialog-close [disabled]="loading()">Cancelar</button>
-  <button mat-button cdkFocusInitial form="dataForm" [disabled]="loading()">
-    {{ loading() ? "Guardando..." : "Guardar" }}
+  <button mat-button mat-dialog-close [disabled]="submitting()">Cancelar</button>
+  <button
+    mat-button
+    cdkFocusInitial
+    form="dataForm"
+    [disabled]="submitting()"
+  >
+    {{ submitting() ? "Guardando..." : "Guardar" }}
   </button>
 </mat-dialog-actions>

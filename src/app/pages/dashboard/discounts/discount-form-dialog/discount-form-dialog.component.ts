@@ -1,5 +1,12 @@
-import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
-import { ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  linkedSignal,
+  signal,
+} from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import {
   MAT_DIALOG_DATA,
@@ -18,9 +25,20 @@ import {
   UpdateDiscount,
   UpdateOneDiscountGQL,
 } from '@graphql';
-import { FormToolsService, GlobalStateService } from '@services';
+import { GlobalStateService } from '@services';
 import { discountTypes } from '@utils/contains';
-import { map } from 'rxjs';
+import {
+  applyWhen,
+  form,
+  FormField,
+  FormRoot,
+  max,
+  maxLength,
+  min,
+  required,
+} from '@angular/forms/signals';
+import { firstValueFrom } from 'rxjs';
+import { DiscountFormFields } from '@app/types/discounts';
 
 @Component({
   selector: 'app-discount-form-dialog',
@@ -29,144 +47,139 @@ import { map } from 'rxjs';
     MatFormFieldModule,
     MatInputModule,
     MatButtonModule,
-    ReactiveFormsModule,
     MatSelectModule,
+    FormField,
+    FormRoot,
   ],
   templateUrl: './discount-form-dialog.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
 export class DiscountFormDialogComponent {
-  public readonly formTools = inject(FormToolsService);
+  public readonly data: DiscountPartsFragment | null = inject(MAT_DIALOG_DATA);
+
   private readonly _snackBar = inject(MatSnackBar);
 
-  public loading = signal(false);
-  public data: DiscountPartsFragment | null = inject(MAT_DIALOG_DATA);
-
   private readonly _globalStateService = inject(GlobalStateService);
-  private readonly _createOneCycle = inject(CreateOneDiscountGQL);
-  private readonly _updateOneCycle = inject(UpdateOneDiscountGQL);
+  private readonly _createOneDiscount = inject(CreateOneDiscountGQL);
+  private readonly _updateOneDiscount = inject(UpdateOneDiscountGQL);
 
   private readonly _dialogRef = inject(
     MatDialogRef<DiscountFormDialogComponent>
   );
 
-  public discountTypes = discountTypes;
+  public readonly discountTypes = discountTypes;
 
-  public formGroup = this.formTools.builder.group({
-    name: this.formTools.builder.control<string>('', {
-      validators: [Validators.required, Validators.maxLength(64)],
-      nonNullable: true,
-    }),
-    value: this.formTools.builder.control<number>(0, {
-      validators: [Validators.required, Validators.min(1), Validators.max(100)],
-      nonNullable: true,
-    }),
-    type: this.formTools.builder.control<DiscountBy>(DiscountBy.Percentage, {
-      validators: [Validators.required],
-      nonNullable: true,
-    }),
+  public readonly isEditing = computed(() => !!this.data?.id);
+
+  private readonly _initialModel = computed<DiscountFormFields>(() => ({
+    name: this.data?.name ?? '',
+    value: this.data?.value ?? 0,
+    type: this.data?.type ?? DiscountBy.Percentage,
+  }));
+
+  public readonly discountModel = linkedSignal<DiscountFormFields, DiscountFormFields>({
+    source: this._initialModel,
+    computation: (initial) => ({ ...initial }),
   });
 
-  ngOnInit(): void {
-    if (!!this.data?.id) {
-      this.formGroup.patchValue({
-        name: this.data.name,
-        value: this.data.value,
-        type: this.data.type,
-      });
-    }
+  public readonly discountForm = form(this.discountModel, (schema) => {
+    required(schema.name, { message: 'Campo requerido' });
+    maxLength(schema.name, 64, { message: 'Máximo 64 caracteres' });
+    required(schema.type, { message: 'Campo requerido' });
 
-    this.formGroup.get('type')!.valueChanges.subscribe((type) => {
-      this.formGroup.get('value')!.clearValidators();
-
-      if (type === DiscountBy.Percentage) {
-        this.formGroup
-          .get('value')!
-          .setValidators([
-            Validators.required,
-            Validators.min(1),
-            Validators.max(100),
-          ]);
-      } else if (type === DiscountBy.Fixed) {
-        this.formGroup
-          .get('value')!
-          .setValidators([Validators.required, Validators.min(1)]);
+    // Porcentaje: 1-100; Monto fijo: >= 1.
+    applyWhen(
+      schema,
+      ({ valueOf }) => valueOf(schema.type) === DiscountBy.Percentage,
+      (schema) => {
+        required(schema.value, { message: 'Campo requerido' });
+        min(schema.value, 1, { message: 'El valor mínimo es 1' });
+        max(schema.value, 100, { message: 'El valor máximo es 100' });
       }
-      this.formGroup.get('value')!.updateValueAndValidity();
+    );
+
+    applyWhen(
+      schema,
+      ({ valueOf }) => valueOf(schema.type) === DiscountBy.Fixed,
+      (schema) => {
+        required(schema.value, { message: 'Campo requerido' });
+        min(schema.value, 1, { message: 'El valor mínimo es 1' });
+      }
+    );
+  });
+
+  public readonly submitting = signal(false);
+
+  constructor() {
+    effect(() => {
+      this._dialogRef.disableClose = this.submitting();
     });
   }
 
   public async submit(): Promise<void> {
-    if (this.formGroup.valid) {
-      this.loading.set(true);
-
-      const values = this.formGroup.getRawValue();
-
-      if (!!this.data?.id) {
-        this._update(values).subscribe({
-          next: (cycle) => {
-            this._snackBar.open(
-              'Se ha actualizado el descuento correctamente',
-              'Cerrar',
-              {
-                duration: 1000,
-                horizontalPosition: 'center',
-                verticalPosition: 'bottom',
-              }
-            );
-            this._dialogRef.close(cycle);
-          },
-          error: (err) => {
-            console.error('UPDATE DISCOUNT ERROR: ', err);
-          },
-          complete: () => {
-            this.loading.set(false);
-          },
-        });
-      } else if (this._globalStateService.branch?.id) {
-        this._save(values).subscribe({
-          next: (cycle) => {
-            this._snackBar.open(
-              'Se ha creado un descuento correctamente',
-              'Cerrar',
-              {
-                duration: 1000,
-                horizontalPosition: 'center',
-                verticalPosition: 'bottom',
-              }
-            );
-            this._dialogRef.close(cycle);
-          },
-          error: (err) => {
-            console.error('CREATE DISCOUNT ERROR: ', err);
-          },
-          complete: () => {
-            this.loading.set(false);
-          },
-        });
-      }
+    if (this.discountForm().invalid()) {
+      return;
     }
-  }
 
-  private _update(values: UpdateDiscount) {
-    return this._updateOneCycle
-      .mutate({
-        variables: {
-          id: this.data!.id,
-          update: values,
-        },
-      })
-      .pipe(map((value) => value.data?.updateOneDiscount));
-  }
+    const values = this.discountModel();
+    this.submitting.set(true);
 
-  private _save(values: Omit<CreateDiscount, 'branchId'>) {
-    return this._createOneCycle
-      .mutate({
-        variables: {
-          discount: { ...values, branchId: this._globalStateService.branch!.id },
-        },
-      })
-      .pipe(map((value) => value.data?.createOneDiscount));
+    try {
+      if (this.isEditing()) {
+        const updated = await firstValueFrom(
+          this._updateOneDiscount.mutate({
+            variables: {
+              id: this.data!.id,
+              update: values as UpdateDiscount,
+            },
+          })
+        );
+
+        this._dialogRef.close(updated.data?.updateOneDiscount);
+        this._snackBar.open(
+          'Se ha actualizado el descuento correctamente',
+          'Cerrar',
+          {
+            duration: 1000,
+            horizontalPosition: 'center',
+            verticalPosition: 'bottom',
+          }
+        );
+      } else if (this._globalStateService.branch?.id) {
+        const created = await firstValueFrom(
+          this._createOneDiscount.mutate({
+            variables: {
+              discount: {
+                ...values,
+                branchId: this._globalStateService.branch!.id,
+              } as Omit<CreateDiscount, 'branchId'> & {
+                branchId: string;
+              },
+            },
+          })
+        );
+
+        this._dialogRef.close(created.data?.createOneDiscount);
+        this._snackBar.open(
+          'Se ha creado un descuento correctamente',
+          'Cerrar',
+          {
+            duration: 1000,
+            horizontalPosition: 'center',
+            verticalPosition: 'bottom',
+          }
+        );
+      }
+    } catch (err) {
+      console.error(
+        this.isEditing()
+          ? 'UPDATE DISCOUNT ERROR: '
+          : 'CREATE DISCOUNT ERROR: ',
+        err
+      );
+    } finally {
+      this.submitting.set(false);
+    }
   }
 }

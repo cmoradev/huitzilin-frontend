@@ -6,19 +6,21 @@
           <h1 class="text-primary text-xl font-bold">Inicio de sesión</h1>
         </div>
 
-        <form id="dataForm" [formGroup]="formGroup" (ngSubmit)="submit()">
+        <form id="dataForm" [formRoot]="loginForm" (submit)="submit()">
           <div class="flex flex-col gap-3">
             <mat-form-field>
               <mat-label>Usuario</mat-label>
               <input
                 matInput
                 placeholder="Ej: usuario123"
-                formControlName="username"
+                [formField]="loginForm.username"
               />
               <mat-hint>Ingrese su nombre de usuario</mat-hint>
-              <mat-error>
-                {{ formTools.checkForErrorsIn(formGroup.get("username")) }}
-              </mat-error>
+              @if (loginForm.username().touched() && loginForm.username().invalid()) {
+                <mat-error>
+                  {{ loginForm.username().errors()[0].message }}
+                </mat-error>
+              }
             </mat-form-field>
 
             <mat-form-field>
@@ -27,7 +29,7 @@
                 matInput
                 [type]="showPassword() ? 'text' : 'password'"
                 placeholder="Ej: usuario123"
-                formControlName="password"
+                [formField]="loginForm.password"
               />
               <button
                 type="button"
@@ -38,14 +40,16 @@
                 <mat-icon>{{ showPassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
               </button>
               <mat-hint>Ingrese su contraseña</mat-hint>
-              <mat-error>
-                {{ formTools.checkForErrorsIn(formGroup.get("password")) }}
-              </mat-error>
+              @if (loginForm.password().touched() && loginForm.password().invalid()) {
+                <mat-error>
+                  {{ loginForm.password().errors()[0].message }}
+                </mat-error>
+              }
             </mat-form-field>
           </div>
 
           <div class="flex space-between gap-1 my-2">
-            <mat-checkbox formControlName="rememberMe">
+            <mat-checkbox [formField]="loginForm.rememberMe">
               Recordar en este dispositivo
             </mat-checkbox>
 
@@ -58,8 +62,13 @@
             </button>
           </div>
 
-          <button type="submit" mat-flat-button class="w-full mt-2">
-            {{ loading() ? "Entrando..." : "Entrar" }}
+          <button
+            type="submit"
+            mat-flat-button
+            class="w-full mt-2"
+            [disabled]="loginForm().submitting()"
+          >
+            {{ loginForm().submitting() ? 'Entrando...' : 'Entrar' }}
           </button>
         </form>
       </mat-card-content>

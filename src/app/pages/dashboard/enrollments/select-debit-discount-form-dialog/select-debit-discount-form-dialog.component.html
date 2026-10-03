@@ -1,11 +1,11 @@
 <h2 mat-dialog-title>Seleccione un descuento</h2>
 <mat-dialog-content>
-  <form id="selectDiscountForm" [formGroup]="formGroup" (ngSubmit)="submit()">
+  <form id="selectDiscountForm" [formRoot]="selectForm" (submit)="submit()">
     <mat-form-field class="w-full">
       <mat-label>Descuento</mat-label>
-      <mat-select formControlName="discount" multiLineOption>
+      <mat-select [formField]="selectForm.discountId" multiLineOption>
         @for (discount of discounts(); track discount.id) {
-        <mat-option [value]="discount">
+        <mat-option [value]="discount.id">
           <h4 mat-line>{{ discount.name }}</h4>
           @if (discount.type === 'FIXED') {
           <p mat-line class="text-sm text-gray-500">
@@ -19,6 +19,11 @@
         </mat-option>
         }
       </mat-select>
+      @if (selectForm.discountId().touched() && selectForm.discountId().invalid()) {
+        <mat-error>
+          {{ selectForm.discountId().errors()[0].message }}
+        </mat-error>
+      }
     </mat-form-field>
   </form>
 </mat-dialog-content>

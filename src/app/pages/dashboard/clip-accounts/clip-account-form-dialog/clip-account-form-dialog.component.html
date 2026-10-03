@@ -1,20 +1,22 @@
 <h2 mat-dialog-title>
-  {{ !!data?.id ? "Actualizar" : "Crear" }} ciclo escolar
+  {{ isEditing() ? "Actualizar" : "Crear" }} ciclo escolar
 </h2>
 <mat-dialog-content>
-  <form id="dataForm" [formGroup]="formGroup" (ngSubmit)="submit()">
+  <form id="dataForm" [formRoot]="accountForm" (submit)="submit()">
     <div class="flex flex-col gap-3">
       <mat-form-field>
         <mat-label>Nombre</mat-label>
         <input
           matInput
           placeholder="Ej: contabilidad@example.com"
-          formControlName="name"
+          [formField]="accountForm.name"
         />
         <mat-hint>Ingrese el nombre de la cuenta clip</mat-hint>
-        <mat-error>
-          {{ formTools.checkForErrorsIn(formGroup.get("name")) }}
-        </mat-error>
+        @if (accountForm.name().touched() && accountForm.name().invalid()) {
+          <mat-error>
+            {{ accountForm.name().errors()[0].message }}
+          </mat-error>
+        }
       </mat-form-field>
 
       <p>
@@ -38,12 +40,14 @@
         <input
           matInput
           placeholder="Ej: 1234567890abcdef"
-          formControlName="token"
+          [formField]="accountForm.token"
         />
         <mat-hint>Ingrese el token de autenticación de la cuenta clip</mat-hint>
-        <mat-error>
-          {{ formTools.checkForErrorsIn(formGroup.get("token")) }}
-        </mat-error>
+        @if (accountForm.token().touched() && accountForm.token().invalid()) {
+          <mat-error>
+            {{ accountForm.token().errors()[0].message }}
+          </mat-error>
+        }
       </mat-form-field>
 
       <mat-form-field>
@@ -51,12 +55,14 @@
         <input
           matInput
           placeholder="Ej: https://hkdk.events/dqhneecgi8i15b"
-          formControlName="webhook"
+          [formField]="accountForm.webhook"
         />
         <mat-hint>Ingrese un enlace de webhook</mat-hint>
-        <mat-error>
-          {{ formTools.checkForErrorsIn(formGroup.get("webhook")) }}
-        </mat-error>
+        @if (accountForm.webhook().touched() && accountForm.webhook().invalid()) {
+          <mat-error>
+            {{ accountForm.webhook().errors()[0].message }}
+          </mat-error>
+        }
       </mat-form-field>
 
       <mat-form-field>
@@ -66,12 +72,14 @@
         <input
           matInput
           placeholder="Ej: https://portal.apexcentre.com.mx/status/"
-          formControlName="default"
+          [formField]="accountForm.default"
         />
         <mat-hint>Ingrese el enlace por defecto</mat-hint>
-        <mat-error>
-          {{ formTools.checkForErrorsIn(formGroup.get("default")) }}
-        </mat-error>
+        @if (accountForm.default().touched() && accountForm.default().invalid()) {
+          <mat-error>
+            {{ accountForm.default().errors()[0].message }}
+          </mat-error>
+        }
       </mat-form-field>
 
       <mat-form-field>
@@ -79,12 +87,14 @@
         <input
           matInput
           placeholder="Ej: https://portal.apexcentre.com.mx/status/"
-          formControlName="success"
+          [formField]="accountForm.success"
         />
         <mat-hint>Ingrese un enlace de éxito</mat-hint>
-        <mat-error>
-          {{ formTools.checkForErrorsIn(formGroup.get("success")) }}
-        </mat-error>
+        @if (accountForm.success().touched() && accountForm.success().invalid()) {
+          <mat-error>
+            {{ accountForm.success().errors()[0].message }}
+          </mat-error>
+        }
       </mat-form-field>
 
       <mat-form-field>
@@ -92,19 +102,21 @@
         <input
           matInput
           placeholder="Ej: https://portal.apexcentre.com.mx/status/"
-          formControlName="error"
+          [formField]="accountForm.error"
         />
         <mat-hint>Ingrese un enlace de error</mat-hint>
-        <mat-error>
-          {{ formTools.checkForErrorsIn(formGroup.get("error")) }}
-        </mat-error>
+        @if (accountForm.error().touched() && accountForm.error().invalid()) {
+          <mat-error>
+            {{ accountForm.error().errors()[0].message }}
+          </mat-error>
+        }
       </mat-form-field>
     </div>
   </form>
 </mat-dialog-content>
 <mat-dialog-actions align="end">
-  <button mat-button mat-dialog-close [disabled]="loading()">Cancelar</button>
-  <button mat-button cdkFocusInitial form="dataForm" [disabled]="loading()">
-    {{ loading() ? "Guardando..." : "Guardar" }}
+  <button mat-button mat-dialog-close [disabled]="submitting()">Cancelar</button>
+  <button mat-button cdkFocusInitial form="dataForm" [disabled]="submitting()">
+    {{ submitting() ? "Guardando..." : "Guardar" }}
   </button>
 </mat-dialog-actions>

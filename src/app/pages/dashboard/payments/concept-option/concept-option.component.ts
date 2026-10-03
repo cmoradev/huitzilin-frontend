@@ -1,4 +1,4 @@
-import { CurrencyPipe, NgClass } from '@angular/common';
+import { CurrencyPipe } from '@angular/common';
 import {
   AfterViewInit,
   Component,
@@ -7,16 +7,19 @@ import {
   input,
   output,
   signal,
-  ChangeDetectionStrategy
+  ChangeDetectionStrategy,
 } from '@angular/core';
 import { toObservable } from '@angular/core/rxjs-interop';
-import { ReactiveFormsModule } from '@angular/forms';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatRippleModule } from '@angular/material/core';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { CurrentEnrollmentPartsFragment, DebitPartsFragment, DebitState, EnrollmentPartsFragment } from '@graphql';
+import {
+  CurrentEnrollmentPartsFragment,
+  DebitPartsFragment,
+  DebitState,
+} from '@graphql';
 import { isAfter } from 'date-fns';
 import { skip } from 'rxjs';
 import { PosService } from '../../../../services/pos.service';
@@ -30,8 +33,6 @@ import { CompletePaymentDialogComponent } from '../complete-payment-dialog/compl
     MatIconModule,
     MatTooltipModule,
     CurrencyPipe,
-    NgClass,
-    ReactiveFormsModule,
   ],
   templateUrl: './concept-option.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
@@ -46,7 +47,7 @@ export class ConceptOptionComponent implements AfterViewInit {
   public enrollment = input.required<CurrentEnrollmentPartsFragment>();
   public refresh = output<void>();
 
-  public pendingPayment  = computed(() => {
+  public pendingPayment = computed(() => {
     const [concept] = this.debit().concepts;
 
     return concept?.pendingPayment ?? this.debit().total;
@@ -134,7 +135,7 @@ export class ConceptOptionComponent implements AfterViewInit {
     }
   }
 
-  private addPaymentOnIncome() {
+  private addPaymentOnIncome(): void {
     const $dialog = this._dialog.open(CompletePaymentDialogComponent, {
       width: '32rem',
       data: {
@@ -153,7 +154,7 @@ export class ConceptOptionComponent implements AfterViewInit {
     });
   }
 
-  private _markAsOverdue() {
+  private _markAsOverdue(): void {
     const today = new Date();
     const dueDate = new Date(this.debit().dueDate);
 

@@ -1,5 +1,12 @@
-import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
-import { ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  linkedSignal,
+  signal,
+} from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import {
   MAT_DIALOG_DATA,
@@ -16,11 +23,19 @@ import {
   PolicyPartsFragment,
   UpdateOnePolicyGQL,
 } from '@graphql';
-import { FormToolsService } from '@services';
+import {
+  form,
+  FormField,
+  FormRoot,
+  minLength,
+  required,
+} from '@angular/forms/signals';
+import { firstValueFrom } from 'rxjs';
 import { ActionFormComponent } from '../action-form/action-form.component';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatChipsModule } from '@angular/material/chips';
+import { PolicyFormFields } from '@app/types/policies';
 
 @Component({
   selector: 'app-policy-form-dialog',
@@ -30,67 +45,79 @@ import { MatChipsModule } from '@angular/material/chips';
     MatInputModule,
     MatButtonModule,
     MatExpansionModule,
-    ReactiveFormsModule,
     MatTooltipModule,
     MatIconModule,
     MatChipsModule,
+    FormField,
+    FormRoot,
   ],
   templateUrl: './policy-form-dialog.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
 export class PolicyFormDialogComponent {
-  public formTools = inject(FormToolsService);
   public loading = signal<boolean>(false);
   public data = inject<PolicyPartsFragment | null>(MAT_DIALOG_DATA);
 
   private readonly _dialog = inject(MatDialog);
   private readonly _dialogRef = inject(MatDialogRef<PolicyFormDialogComponent>);
-  private readonly createOnePolicyGQL = inject(CreateOnePolicyGQL);
-  private readonly updateOnePolicyGQL = inject(UpdateOnePolicyGQL);
+  private readonly _createOnePolicy = inject(CreateOnePolicyGQL);
+  private readonly _updateOnePolicy = inject(UpdateOnePolicyGQL);
 
-  public actions = signal<CreateAction[]>([]);
+  public readonly actions = signal<CreateAction[]>([]);
 
-  public formGroup = this.formTools.builder.group({
-    name: this.formTools.builder.control<string>(this.data?.name ?? '', {
-      validators: [Validators.required, Validators.minLength(4)],
-      nonNullable: true,
-    }),
+  public readonly isEditing = computed(() => !!this.data?.id);
+
+  private readonly _initialModel = computed<PolicyFormFields>(() => ({
+    name: this.data?.name ?? '',
+  }));
+
+  public readonly policyModel = linkedSignal<PolicyFormFields, PolicyFormFields>({
+    source: this._initialModel,
+    computation: (initial) => ({ ...initial }),
   });
 
-  public sutmitPermission(value: CreateAction[]) {
+  public readonly policyForm = form(this.policyModel, (schema) => {
+    required(schema.name, { message: 'Campo requerido' });
+    minLength(schema.name, 4, { message: 'Mínimo 4 caracteres' });
+  });
+
+  constructor() {
+    effect(() => {
+      this._dialogRef.disableClose = this.loading();
+    });
+  }
+
+  public submitPermission(value: CreateAction[]) {
     console.log(value);
   }
 
-  public submit() {
-    if (this.formGroup.valid) {
-      this.loading.set(true);
-      const values = this.formGroup.getRawValue();
+  public async submit(): Promise<void> {
+    if (this.policyForm().invalid()) {
+      return;
+    }
 
-      if (!!this.data?.id) {
-        this.updateOnePolicyGQL
-          .mutate({
+    const values = this.policyModel();
+    this.loading.set(true);
+
+    try {
+      if (this.isEditing()) {
+        const updated = await firstValueFrom(
+          this._updateOnePolicy.mutate({
             variables: {
-              id: this.data?.id,
+              id: this.data!.id,
               update: {
                 name: values.name,
                 actions: this.actions(),
               },
             },
           })
-          .subscribe({
-            next: ({ data }) => {
-              this.loading.set(false);
-              this._dialogRef.close(data?.updateOnePolicy);
-            },
-            error: (error) => {
-              this.loading.set(false);
-              console.error('Error creating user:', error);
-            },
-          });
+        );
+
+        this._dialogRef.close(updated.data?.updateOnePolicy);
       } else {
-        this.createOnePolicyGQL
-          .mutate({
+        const created = await firstValueFrom(
+          this._createOnePolicy.mutate({
             variables: {
               policy: {
                 name: values.name,
@@ -98,17 +125,14 @@ export class PolicyFormDialogComponent {
               },
             },
           })
-          .subscribe({
-            next: ({ data }) => {
-              this.loading.set(false);
-              this._dialogRef.close(data?.createOnePolicy);
-            },
-            error: (error) => {
-              this.loading.set(false);
-              console.error('Error creating user:', error);
-            },
-          });
+        );
+
+        this._dialogRef.close(created.data?.createOnePolicy);
       }
+    } catch (err) {
+      console.error('Error guardando política:', err);
+    } finally {
+      this.loading.set(false);
     }
   }
 

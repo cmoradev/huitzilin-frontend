@@ -1,13 +1,11 @@
-import { NgClass } from '@angular/common';
 import {
-  AfterViewInit,
+  ChangeDetectionStrategy,
   Component,
+  effect,
   inject,
   signal,
-  ViewChild,
-  ChangeDetectionStrategy
+  viewChild,
 } from '@angular/core';
-import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatDialog } from '@angular/material/dialog';
@@ -17,8 +15,9 @@ import { MatInputModule } from '@angular/material/input';
 import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { toObservable } from '@angular/core/rxjs-interop';
 import { GetUsersPageGQL, UserFilter, UserPartsFragment } from '@graphql';
-import { debounceTime, merge, startWith } from 'rxjs';
+import { debounceTime } from 'rxjs';
 import { UserFormDialogComponent } from './user-form-dialog/user-form-dialog.component';
 import { UserDeleteDialogComponent } from './user-delete-dialog/user-delete-dialog.component';
 import { UserPoliciesDialogComponent } from './user-policies-dialog/user-policies-dialog.component';
@@ -26,7 +25,6 @@ import { UserPoliciesDialogComponent } from './user-policies-dialog/user-policie
 @Component({
   selector: 'app-users',
   imports: [
-    NgClass,
     MatCardModule,
     MatIconModule,
     MatTableModule,
@@ -35,15 +33,14 @@ import { UserPoliciesDialogComponent } from './user-policies-dialog/user-policie
     MatFormFieldModule,
     MatInputModule,
     MatButtonModule,
-    ReactiveFormsModule,
   ],
   templateUrl: './users.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
-export class UsersComponent implements AfterViewInit {
-  @ViewChild('paginator') public paginator!: MatPaginator;
-  public searchControl = new FormControl('');
+export class UsersComponent {
+  public readonly paginator = viewChild.required<MatPaginator>('paginator');
+  public readonly searchTerm = signal('');
 
   public displayedColumns: string[] = ['name', 'actions'];
   public dataSource = new MatTableDataSource<UserPartsFragment>([]);
@@ -54,26 +51,61 @@ export class UsersComponent implements AfterViewInit {
   private readonly dialog = inject(MatDialog);
   private readonly _usersPageGQL = inject(GetUsersPageGQL);
 
-  ngAfterViewInit(): void {
-    merge(this.paginator.page, this.searchControl.valueChanges)
-      .pipe(debounceTime(300), startWith({}))
-      .subscribe({
-        next: () => {
-          this.refresh();
-        },
-      });
+  private readonly _debouncedSearchTerm = signal('');
+
+  constructor() {
+    toObservable(this.searchTerm)
+      .pipe(debounceTime(300))
+      .subscribe((term) => this._debouncedSearchTerm.set(term));
+
+    effect(() => {
+      const paginator = this.paginator();
+      const filter = this._buildFilter(this._debouncedSearchTerm());
+
+      const limit = paginator.pageSize;
+      const offset = paginator.pageIndex * limit;
+
+      this._usersPageGQL
+        .watch({
+          variables: { limit, offset, filter },
+          fetchPolicy: 'cache-and-network',
+          nextFetchPolicy: 'cache-and-network',
+          notifyOnNetworkStatusChange: true,
+        })
+        .valueChanges.subscribe({
+          next: ({ data, loading }) => {
+            const users = data?.users;
+            const nodes = (users?.nodes ?? []) as UserPartsFragment[];
+            const totalCount = users?.totalCount ?? 0;
+
+            this.dataSource.data = nodes;
+
+            this.loading.set(loading);
+            this.totalCount.set(totalCount);
+          },
+        });
+    });
   }
 
-  public refresh() {
-    const limit: number = this.paginator.pageSize;
-    const offset: number = this.paginator.pageIndex * limit;
-
-    const filter: UserFilter = {
+  private _buildFilter(term: string): UserFilter {
+    return {
       or: [
-        { email: { iLike: `%${this.searchControl.value}%` } },
-        { username: { iLike: `%${this.searchControl.value}%` } },
+        { email: { iLike: `%${term}%` } },
+        { username: { iLike: `%${term}%` } },
       ],
     };
+  }
+
+  public onSearchInput(event: Event): void {
+    this.searchTerm.set((event.target as HTMLInputElement).value);
+  }
+
+  public refresh(): void {
+    const paginator = this.paginator();
+    const filter = this._buildFilter(this.searchTerm());
+
+    const limit = paginator.pageSize;
+    const offset = paginator.pageIndex * limit;
 
     this._usersPageGQL
       .watch({

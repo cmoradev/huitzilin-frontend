@@ -1,6 +1,6 @@
 <h2 mat-dialog-title>{{ !!data?.id ? "Actualizar" : "Crear" }} horario</h2>
 <mat-dialog-content>
-  <form id="dataForm" [formGroup]="formGroup" (ngSubmit)="submit()">
+  <form id="dataForm" [formRoot]="scheduleForm" (submit)="submit()">
     <div class="flex flex-col gap-3">
       <mat-form-field>
         <mat-label>Docente</mat-label>
@@ -8,25 +8,26 @@
           type="text"
           placeholder="Ej. Eduardo Morales"
           matInput
-          formControlName="teacher"
+          [value]="displayTeacher(scheduleModel().teacher)"
+          (input)="scheduleForm.teacher().value.set(null)"
+          (blur)="scheduleForm.teacher().markAsTouched()"
           [matAutocomplete]="autoTeachers"
         />
-        <mat-hint>Seleccione una disciplina </mat-hint>
-        <mat-error>
-          {{ formTools.checkForErrorsIn(formGroup.get("teacher")) }}
-        </mat-error>
-        @if (formGroup.get("teacher")?.value) {
-        <button
-          mat-icon-button
-          matSuffix
-          (click)="formGroup.get('teacher')?.setValue(null)"
-        >
+        <mat-hint>Seleccione un docente</mat-hint>
+        @if (scheduleForm.teacher().touched() && scheduleForm.teacher().invalid()) {
+          <mat-error>
+            {{ scheduleForm.teacher().errors()[0].message }}
+          </mat-error>
+        }
+        @if (scheduleModel().teacher) {
+        <button mat-icon-button matSuffix (click)="clearTeacher()">
           <mat-icon svgIcon="close" />
         </button>
         }
         <mat-autocomplete
           #autoTeachers="matAutocomplete"
-          [displayWith]="teacherTools.displayFn"
+          [displayWith]="displayTeacher"
+          (optionSelected)="onTeacherSelected($event.option.value)"
         >
           @for (teacher of teacherTools.options(); track teacher.id) {
           <mat-option [value]="teacher">
@@ -45,25 +46,26 @@
           type="text"
           placeholder="Ej. Taekwondo"
           matInput
-          formControlName="discipline"
+          [value]="displayDiscipline(scheduleModel().discipline)"
+          (input)="onDisciplineInput($any($event.target).value); scheduleForm.discipline().value.set(null)"
+          (blur)="scheduleForm.discipline().markAsTouched()"
           [matAutocomplete]="autoDisciplines"
         />
-        <mat-hint>Seleccione una disciplina </mat-hint>
-        <mat-error>
-          {{ formTools.checkForErrorsIn(formGroup.get("discipline")) }}
-        </mat-error>
-        @if (formGroup.get("discipline")?.value) {
-        <button
-          mat-icon-button
-          matSuffix
-          (click)="formGroup.get('discipline')?.setValue(null)"
-        >
+        <mat-hint>Seleccione una disciplina</mat-hint>
+        @if (scheduleForm.discipline().touched() && scheduleForm.discipline().invalid()) {
+          <mat-error>
+            {{ scheduleForm.discipline().errors()[0].message }}
+          </mat-error>
+        }
+        @if (scheduleModel().discipline) {
+        <button mat-icon-button matSuffix (click)="clearDiscipline()">
           <mat-icon svgIcon="close" />
         </button>
         }
         <mat-autocomplete
           #autoDisciplines="matAutocomplete"
-          [displayWith]="disciplineTools.displayFn"
+          [displayWith]="displayDiscipline"
+          (optionSelected)="onDisciplineSelected($event.option.value)"
         >
           @for (discipline of disciplineTools.options(); track discipline.id) {
           <mat-option [value]="discipline">
@@ -75,7 +77,7 @@
 
       <mat-form-field>
         <mat-label>Niveles permitidos</mat-label>
-        <mat-select formControlName="levels" multiple>
+        <mat-select [formField]="scheduleForm.levels" multiple>
           @for (level of levelTools.options(); track $index) {
           <mat-option [value]="level.id">{{ level.abbreviation }}</mat-option>
           }
@@ -83,22 +85,26 @@
         <mat-hint>
           Seleccione los niveles que pueden tomar esta disciplina
         </mat-hint>
-        <mat-error>
-          {{ formTools.checkForErrorsIn(formGroup.get("levels")) }}
-        </mat-error>
+        @if (scheduleForm.levels().touched() && scheduleForm.levels().invalid()) {
+          <mat-error>
+            {{ scheduleForm.levels().errors()[0].message }}
+          </mat-error>
+        }
       </mat-form-field>
 
       <mat-form-field>
         <mat-label>Día</mat-label>
-        <mat-select formControlName="day">
+        <mat-select [formField]="scheduleForm.day">
           @for (day of days; track $index) {
           <mat-option [value]="day.value">{{ day.label }}</mat-option>
           }
         </mat-select>
-        <mat-hint> Seleccione el día de la semana con actividad </mat-hint>
-        <mat-error>
-          {{ formTools.checkForErrorsIn(formGroup.get("day")) }}
-        </mat-error>
+        <mat-hint>Seleccione el día de la semana con actividad</mat-hint>
+        @if (scheduleForm.day().touched() && scheduleForm.day().invalid()) {
+          <mat-error>
+            {{ scheduleForm.day().errors()[0].message }}
+          </mat-error>
+        }
       </mat-form-field>
 
       <div class="grid grid-cols-2 gap-3">
@@ -107,18 +113,18 @@
           <input
             matInput
             [matTimepicker]="timePicker1"
-            formControlName="start"
-            matTimepickerMin="08:00"
-            matTimepickerMax="23:00"
+            [formField]="scheduleForm.start"
           />
           <mat-timepicker-toggle matIconSuffix [for]="timePicker1">
             <mat-icon matTimepickerToggleIcon>keyboard_arrow_down</mat-icon>
           </mat-timepicker-toggle>
           <mat-timepicker #timePicker1 interval="30min" />
-          <mat-hint> Inicio de las actividades </mat-hint>
-          <mat-error>
-            {{ formTools.checkForErrorsIn(formGroup.get("start")) }}
-          </mat-error>
+          <mat-hint>Inicio de las actividades</mat-hint>
+          @if (scheduleForm.start().touched() && scheduleForm.start().invalid()) {
+            <mat-error>
+              {{ scheduleForm.start().errors()[0].message }}
+            </mat-error>
+          }
         </mat-form-field>
 
         <mat-form-field>
@@ -126,31 +132,25 @@
           <input
             matInput
             [matTimepicker]="timePicker2"
-            formControlName="end"
-            matTimepickerMin="08:00"
-            matTimepickerMax="23:00"
+            [formField]="scheduleForm.end"
           />
           <mat-timepicker-toggle matIconSuffix [for]="timePicker2">
             <mat-icon matTimepickerToggleIcon>keyboard_arrow_down</mat-icon>
           </mat-timepicker-toggle>
           <mat-timepicker #timePicker2 interval="30min" />
-          <mat-hint> Cierre de las actividades </mat-hint>
-          <mat-error>
-            {{ formTools.checkForErrorsIn(formGroup.get("end")) }}
-          </mat-error>
+          <mat-hint>Cierre de las actividades</mat-hint>
+          @if (scheduleForm.end().touched() && scheduleForm.end().invalid()) {
+            <mat-error>
+              {{ scheduleForm.end().errors()[0].message }}
+            </mat-error>
+          }
         </mat-form-field>
       </div>
     </div>
   </form>
 </mat-dialog-content>
 <mat-dialog-actions>
-  <div
-    class="flex w-full"
-    [ngClass]="{
-    'justify-between': !!data?.id,
-    'justify-end': !data?.id,
-  }"
-  >
+  <div class="flex w-full" [class.justify-between]="!!data?.id" [class.justify-end]="!data?.id">
     @if (!!data?.id) {
     <button
       mat-button

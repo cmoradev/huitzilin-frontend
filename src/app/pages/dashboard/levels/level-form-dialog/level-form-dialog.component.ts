@@ -1,5 +1,12 @@
-import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
-import { ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  linkedSignal,
+  signal,
+} from '@angular/core';
 import { MatButton } from '@angular/material/button';
 import {
   MAT_DIALOG_DATA,
@@ -16,8 +23,16 @@ import {
   LevelPartsFragment,
   UpdateOneLevelGQL,
 } from '@graphql';
-import { FormToolsService, GlobalStateService } from '@services';
-import { map } from 'rxjs';
+import { GlobalStateService } from '@services';
+import {
+  form,
+  FormField,
+  FormRoot,
+  maxLength,
+  required,
+} from '@angular/forms/signals';
+import { firstValueFrom } from 'rxjs';
+import { LevelFormFields } from '@app/types/levels';
 
 @Component({
   selector: 'app-level-form-dialog',
@@ -29,17 +44,15 @@ import { map } from 'rxjs';
     MatButton,
     MatInputModule,
     MatFormFieldModule,
-    ReactiveFormsModule,
+    FormField,
+    FormRoot,
   ],
   templateUrl: './level-form-dialog.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
 export class LevelFormDialogComponent {
-  public readonly formTools = inject(FormToolsService);
-
-  public loading = signal(false);
-  public data: LevelPartsFragment | null = inject(MAT_DIALOG_DATA);
+  public readonly data: LevelPartsFragment | null = inject(MAT_DIALOG_DATA);
 
   private readonly _globalStateService = inject(GlobalStateService);
   private readonly _createOneLevel = inject(CreateOneLevelGQL);
@@ -47,83 +60,79 @@ export class LevelFormDialogComponent {
 
   private readonly _dialogRef = inject(MatDialogRef<LevelFormDialogComponent>);
 
-  public formGroup = this.formTools.builder.group({
-    name: ['', [Validators.required, Validators.maxLength(32)]],
-    abbreviation: ['', [Validators.required, Validators.maxLength(8)]],
+  public readonly isEditing = computed(() => !!this.data?.id);
+
+  private readonly _initialModel = computed<LevelFormFields>(() => ({
+    name: this.data?.name ?? '',
+    abbreviation: this.data?.abbreviation ?? '',
+  }));
+
+  public readonly levelModel = linkedSignal<LevelFormFields, LevelFormFields>({
+    source: this._initialModel,
+    computation: (initial) => ({ ...initial }),
   });
 
-  ngOnInit(): void {
-    if (!!this.data?.id) {
-      this.formGroup.patchValue({
-        name: this.data.name,
-        abbreviation: this.data.abbreviation,
-      });
-    }
+  public readonly levelForm = form(this.levelModel, (schema) => {
+    required(schema.name, { message: 'Campo requerido' });
+    required(schema.abbreviation, { message: 'Campo requerido' });
+    maxLength(schema.name, 32, {
+      message: 'Máximo 32 caracteres',
+    });
+    maxLength(schema.abbreviation, 8, {
+      message: 'Máximo 8 caracteres',
+    });
+  });
+
+  public readonly submitting = signal(false);
+
+  constructor() {
+    effect(() => {
+      this._dialogRef.disableClose = this.submitting();
+    });
   }
 
   public async submit(): Promise<void> {
-    if (this.formGroup.valid) {
-      this.loading.set(true);
+    if (this.levelForm().invalid()) {
+      return;
+    }
 
-      const values = this.formGroup.getRawValue() as any;
+    const values = this.levelModel();
+    this.submitting.set(true);
 
-      if (!!this.data?.id) {
-        this._update(values).subscribe({
-          next: (level) => {
-            this._dialogRef.close(level);
-          },
-          error: (err) => {
-            console.error('UPDATE LEVEL ERROR: ', err);
-          },
-          complete: () => {
-            this.loading.set(false);
-          },
-        });
+    try {
+      if (this.isEditing()) {
+        const updated = await firstValueFrom(
+          this._updateOneLevel.mutate({
+            variables: {
+              id: this.data!.id,
+              update: { ...values },
+            },
+          })
+        );
+
+        this._dialogRef.close(updated.data?.updateOneLevel);
       } else if (this._globalStateService.branch?.id) {
-        this._save(values).subscribe({
-          next: (cycle) => {
-            this._dialogRef.close(cycle);
-          },
-          error: (err) => {
-            console.error('CREATE LEVEL ERROR: ', err);
-          },
-          complete: () => {
-            this.loading.set(false);
-          },
-        });
+        const created = await firstValueFrom(
+          this._createOneLevel.mutate({
+            variables: {
+              level: {
+                ...values,
+                order: 0,
+                branchId: this._globalStateService.branch!.id,
+              },
+            },
+          })
+        );
+
+        this._dialogRef.close(created.data?.createOneLevel);
       }
+    } catch (err) {
+      console.error(
+        this.isEditing() ? 'UPDATE LEVEL ERROR: ' : 'CREATE LEVEL ERROR: ',
+        err
+      );
+    } finally {
+      this.submitting.set(false);
     }
   }
-
-  private _update(values: FormValues) {
-    return this._updateOneLevel
-      .mutate({
-        variables: {
-          id: this.data!.id,
-          update: {
-            ...values,
-          },
-        },
-      })
-      .pipe(map((value) => value.data?.updateOneLevel));
-  }
-
-  private _save(values: FormValues) {
-    return this._createOneLevel
-      .mutate({
-        variables: {
-          level: {
-            ...values,
-            order: 0,
-            branchId: this._globalStateService.branch!.id,
-          },
-        },
-      })
-      .pipe(map((value) => value.data?.createOneLevel));
-  }
 }
-
-type FormValues = {
-  name: string;
-  abbreviation: string;
-};

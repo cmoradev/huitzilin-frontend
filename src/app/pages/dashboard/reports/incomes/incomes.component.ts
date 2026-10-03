@@ -1,15 +1,15 @@
-import { CurrencyPipe, DatePipe, NgClass } from '@angular/common';
+import { CurrencyPipe, DatePipe } from '@angular/common';
 import {
   AfterViewInit,
   Component,
+  effect,
   ElementRef,
   inject,
   OnInit,
   signal,
-  ViewChild,
-  ChangeDetectionStrategy
+  viewChild,
+  ChangeDetectionStrategy,
 } from '@angular/core';
-import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatDatepickerModule } from '@angular/material/datepicker';
@@ -19,7 +19,6 @@ import { MatInputModule } from '@angular/material/input';
 import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { merge, startWith } from 'rxjs';
 import { endOfDay, startOfDay } from 'date-fns';
 import {
   BranchToolsService,
@@ -35,12 +34,11 @@ import { paymentNames } from '@utils/contains';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { RouterLink } from "@angular/router";
+import { RouterLink } from '@angular/router';
 
 @Component({
   selector: 'app-incomes',
   imports: [
-    NgClass,
     MatTableModule,
     MatCardModule,
     MatButtonModule,
@@ -48,7 +46,6 @@ import { RouterLink } from "@angular/router";
     MatPaginatorModule,
     MatIconModule,
     MatFormFieldModule,
-    ReactiveFormsModule,
     MatDatepickerModule,
     MatTooltipModule,
     MatSelectModule,
@@ -57,16 +54,16 @@ import { RouterLink } from "@angular/router";
     MethodPipe,
     DatePipe,
     CurrencyPipe,
-    RouterLink
-],
+    RouterLink,
+  ],
   templateUrl: './incomes.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
 export class IncomesComponent implements AfterViewInit, OnInit {
-  @ViewChild('paginator') public paginator!: MatPaginator;
-  @ViewChild('methodsChart')
-  public methodsChartElement!: ElementRef<HTMLDivElement>;
+  public readonly paginator = viewChild.required<MatPaginator>('paginator');
+  public readonly methodsChartElement =
+    viewChild.required<ElementRef<HTMLDivElement>>('methodsChart');
 
   public loading = signal<boolean>(false);
   public total = signal<number>(0);
@@ -90,57 +87,81 @@ export class IncomesComponent implements AfterViewInit, OnInit {
 
   public branchTools = inject(BranchToolsService);
 
-  public startDateControl = new FormControl<Date>(startOfDay(new Date()));
-  public endDateControl = new FormControl<Date>(endOfDay(new Date()));
-  public branchControl = new FormControl<string | null>(
+  public readonly startDate = signal<Date>(startOfDay(new Date()));
+  public readonly endDate = signal<Date>(endOfDay(new Date()));
+  public readonly branchId = signal<string | null>(
     this._globalStateService.branch?.id ?? null
   );
+
+  constructor() {
+    effect(() => {
+      const start = this.startDate();
+      const end = this.endDate();
+      const branchId = this.branchId();
+      this.refreshWith(start, end, branchId);
+    });
+  }
 
   ngOnInit(): void {
     this.branchTools.fetchAll();
   }
 
   ngAfterViewInit(): void {
-    this.dataSource.paginator = this.paginator;
-
-    merge(
-      this.startDateControl.valueChanges,
-      this.endDateControl.valueChanges,
-      this.branchControl.valueChanges
-    )
-      .pipe(startWith(null))
-      .subscribe({
-        next: () => this.refresh(),
-      });
+    this.dataSource.paginator = this.paginator();
   }
 
-  public download() {
-    if (
-      !!this.startDateControl?.value &&
-      this.endDateControl.value &&
-      this.branchControl.value
-    ) {
-      const start = startOfDay(this.startDateControl.value).toISOString();
-      const end = endOfDay(this.endDateControl.value).toISOString();
-      const branchId = this.branchControl.value;
-
-      this.reportsService.incomesDownload(start, end, branchId);
+  public onStartDateChange(value: Date | null): void {
+    if (value) {
+      this.startDate.set(value);
     }
   }
 
-  public refresh() {
+  public onEndDateChange(value: Date | null): void {
+    if (value) {
+      this.endDate.set(value);
+    }
+  }
+
+  public onBranchChange(value: string | null): void {
+    this.branchId.set(value);
+  }
+
+  public download(): void {
+    const start = this.startDate();
+    const end = this.endDate();
+    const branchId = this.branchId();
+
+    if (start && end && branchId) {
+      this.reportsService.incomesDownload(
+        startOfDay(start).toISOString(),
+        endOfDay(end).toISOString(),
+        branchId
+      );
+    }
+  }
+
+  public refresh(): void {
     this.loading.set(true);
+    this.refreshWith(this.startDate(), this.endDate(), this.branchId());
+  }
 
-    if (
-      !!this.startDateControl?.value &&
-      this.endDateControl.value &&
-      this.branchControl.value
-    ) {
-      const start = startOfDay(this.startDateControl.value).toISOString();
-      const end = endOfDay(this.endDateControl.value).toISOString();
-      const branchId = this.branchControl.value;
+  private refreshWith(
+    start: Date | null,
+    end: Date | null,
+    branchId: string | null
+  ): void {
+    if (!start || !end || !branchId) {
+      return;
+    }
 
-      this.reportsService.incomes(start, end, branchId).subscribe({
+    this.loading.set(true);
+    this.reportsService
+      .incomes(
+        startOfDay(start).toISOString(),
+        endOfDay(end).toISOString(),
+        branchId
+      )
+      .subscribe({
         next: (response) => {
           this.dataSource.data = response.data;
           this.incomeMethods.set(response.groupedByMethod);
@@ -159,12 +180,12 @@ export class IncomesComponent implements AfterViewInit, OnInit {
           this.loading.set(false);
         },
       });
-    }
   }
 
-  private drawCharts() {
-    if (this.methodsChartElement.nativeElement) {
-      const methodsChart = init(this.methodsChartElement.nativeElement);
+  private drawCharts(): void {
+    const chartElement = this.methodsChartElement();
+    if (chartElement) {
+      const methodsChart = init(chartElement.nativeElement);
 
       const methodsData = this.incomeMethods().map((grouped) => ({
         value: grouped.count,

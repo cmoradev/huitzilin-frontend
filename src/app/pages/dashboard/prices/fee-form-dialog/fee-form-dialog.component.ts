@@ -1,5 +1,12 @@
-import { Component, inject, OnInit, signal, ChangeDetectionStrategy } from '@angular/core';
-import { ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  linkedSignal,
+  signal,
+} from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import {
@@ -7,9 +14,7 @@ import {
   MatDialogModule,
   MatDialogRef,
 } from '@angular/material/dialog';
-import {
-  MatFormFieldModule,
-} from '@angular/material/form-field';
+import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import {
@@ -18,51 +23,54 @@ import {
   Frequency,
   UpdateOneFeeGQL,
 } from '@graphql';
-import { FormToolsService, GlobalStateService } from '@services';
+import { GlobalStateService } from '@services';
 import { frequencies } from '@utils/contains';
-import { map } from 'rxjs';
+import {
+  form,
+  FormField,
+  FormRoot,
+  maxLength,
+  min,
+  required,
+} from '@angular/forms/signals';
+import { firstValueFrom } from 'rxjs';
+import { FeeFormFields } from '@app/types/payments';
+
+function getFrequencyName(value: Frequency): string {
+  switch (value) {
+    case Frequency.Monthly:
+      return 'Mensualidad';
+    case Frequency.Single:
+      return 'Pago único';
+    case Frequency.Weekly:
+      return 'Semanal';
+    case Frequency.Daily:
+      return 'Diario';
+    case Frequency.Hourly:
+      return 'Por hora';
+    default:
+      return value;
+  }
+}
 
 @Component({
   selector: 'app-fee-form-dialog',
   imports: [
-    ReactiveFormsModule,
     MatDialogModule,
     MatButtonModule,
     MatCheckboxModule,
     MatFormFieldModule,
     MatInputModule,
     MatSelectModule,
+    FormField,
+    FormRoot,
   ],
   templateUrl: './fee-form-dialog.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
-export class FeeFormDialogComponent implements OnInit {
-  public readonly formTools = inject(FormToolsService);
-  private readonly _globalState = inject(GlobalStateService);
-
-  public loading = signal(false);
-  public data: FeePartsFragment | null = inject(MAT_DIALOG_DATA);
-
-  public frequencies = frequencies;
-
-  public formGroup = this.formTools.builder.group({
-    name: this.formTools.builder.control<string>('',{
-      nonNullable: true,
-      validators: [Validators.required, Validators.maxLength(64)],
-    }),
-    amount: this.formTools.builder.control<number>(0, {
-      nonNullable: true,
-      validators: [Validators.required, Validators.min(0)],
-    }),
-    frequency: this.formTools.builder.control<Frequency>(Frequency.Single, {
-      nonNullable: true,
-      validators: [Validators.required],
-    }),
-    autoLoad: this.formTools.builder.control(false, {
-      nonNullable: true,
-    })
-  });
+export class FeeFormDialogComponent {
+  public readonly data: FeePartsFragment | null = inject(MAT_DIALOG_DATA);
 
   private readonly _globalStateService = inject(GlobalStateService);
   private readonly _createOneFee = inject(CreateOneFeeGQL);
@@ -70,105 +78,102 @@ export class FeeFormDialogComponent implements OnInit {
 
   private readonly _dialogRef = inject(MatDialogRef<FeeFormDialogComponent>);
 
-  ngOnInit(): void {
-    if (!!this.data?.id) {
-      this.formGroup.patchValue({
-        name: this.data.name,
-        amount: this.data.amount,
-        frequency: this.data.frequency,
-        autoLoad: this.data.autoLoad,
-      });
-    }
+  public readonly frequencies = frequencies;
 
-    this.formGroup.get('frequency')?.valueChanges.subscribe((value) => {
-      if (!!value) {
-        this.formGroup
-          .get('name')
-          ?.setValue(`${this.getFrequencyName(value as Frequency)}`);
+  public readonly isEditing = computed(() => !!this.data?.id);
+
+  private readonly _initialModel = computed<FeeFormFields>(() => ({
+    name: this.data?.name ?? '',
+    amount: this.data?.amount ?? 0,
+    frequency: this.data?.frequency ?? Frequency.Single,
+    autoLoad: this.data?.autoLoad ?? false,
+  }));
+
+  public readonly feeModel = linkedSignal<FeeFormFields, FeeFormFields>({
+    source: this._initialModel,
+    computation: (initial) => ({ ...initial }),
+  });
+
+  /**
+   * Marca cuando el usuario editó explícitamente el nombre para detener
+   * el sincronizado automático con la frecuencia.
+   */
+  private readonly _nameEdited = signal(false);
+
+  public readonly feeForm = form(this.feeModel, (schema) => {
+    required(schema.name, { message: 'Campo requerido' });
+    maxLength(schema.name, 64, { message: 'Máximo 64 caracteres' });
+    required(schema.amount, { message: 'Campo requerido' });
+    min(schema.amount, 0, { message: 'El valor debe ser mayor o igual a 0' });
+    required(schema.frequency, { message: 'Campo requerido' });
+  });
+
+  public readonly submitting = signal(false);
+
+  constructor() {
+    effect(() => {
+      const frequency = this.feeModel().frequency;
+
+      if (!this._nameEdited() && !!frequency) {
+        this.feeModel.update((m) => ({
+          ...m,
+          name: getFrequencyName(frequency),
+        }));
       }
+    });
+
+    effect(() => {
+      this._dialogRef.disableClose = this.submitting();
     });
   }
 
+  public onNameInput(value: string): void {
+    this._nameEdited.set(true);
+    this.feeForm.name().value.set(value);
+  }
+
   public async submit(): Promise<void> {
-    if (this.formGroup.valid) {
-      this.loading.set(true);
-
-      const values = this.formGroup.getRawValue();
-
-      if (!!this.data?.id) {
-        this._update(values).subscribe({
-          next: (fee) => {
-            this._dialogRef.close(fee);
-          },
-          error: (err) => {
-            console.error('UPDATE FEE ERROR: ', err);
-          },
-          complete: () => {
-            this.loading.set(false);
-          },
-        });
-      } else if (this._globalStateService.activity!.id) {
-        this._save(values).subscribe({
-          next: (branch) => {
-            this._dialogRef.close(branch);
-          },
-          error: (err) => {
-            console.error('CREATE FEE ERROR: ', err);
-          },
-          complete: () => {
-            this.loading.set(false);
-          },
-        });
-      }
+    if (this.feeForm().invalid()) {
+      return;
     }
-  }
 
-  private _update(values: FormValues) {
-    return this._updateOneFee
-      .mutate({
-        variables: {
-          id: this.data!.id,
-          update: { ...values } as any,
-        },
-      })
-      .pipe(map((value) => value.data?.updateOneFee));
-  }
+    const values = this.feeModel();
+    this.submitting.set(true);
 
-  private _save(values: FormValues) {
-    return this._createOneFee
-      .mutate({
-        variables: {
-          fee: {
-            ...values,
-            withTax: false,
-            packageId: this._globalStateService.activity!.id,
-          },
-        },
-      })
-      .pipe(map((value) => value.data?.createOneFee));
-  }
+    try {
+      if (this.isEditing()) {
+        const updated = await firstValueFrom(
+          this._updateOneFee.mutate({
+            variables: {
+              id: this.data!.id,
+              update: { ...values } as any,
+            },
+          })
+        );
 
-  private getFrequencyName(value: Frequency): string {
-    switch (value) {
-      case Frequency.Monthly:
-        return 'Mensualidad';
-      case Frequency.Single:
-        return 'Pago único';
-      case Frequency.Weekly:
-        return 'Semanal';
-      case Frequency.Daily:
-        return 'Diario';
-      case Frequency.Hourly:
-        return 'Por hora';
-      default:
-        return value;
+        this._dialogRef.close(updated.data?.updateOneFee);
+      } else if (this._globalStateService.activity?.id) {
+        const created = await firstValueFrom(
+          this._createOneFee.mutate({
+            variables: {
+              fee: {
+                ...values,
+                withTax: false,
+                packageId: this._globalStateService.activity!.id,
+              },
+            },
+          })
+        );
+
+        this._dialogRef.close(created.data?.createOneFee);
+      }
+    } catch (err) {
+      console.error(
+        this.isEditing() ? 'UPDATE FEE ERROR: ' : 'CREATE FEE ERROR: ',
+        err
+      );
+    } finally {
+      this.submitting.set(false);
     }
   }
 }
-
-type FormValues = {
-  name: string;
-  amount: number;
-  frequency: Frequency;
-  autoLoad: boolean;
-};

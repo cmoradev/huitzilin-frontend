@@ -9,8 +9,9 @@
         <mat-icon svgIcon="magnify" matPrefix />
         <input
           type="search"
-          [formControl]="searchControl"
           matInput
+          [value]="searchTerm()"
+          (input)="onSearchInput($event)"
           placeholder="Ej: auditor"
         />
       </mat-form-field>
@@ -18,7 +19,7 @@
       <button
         mat-icon-button
         matTooltip="Refrescar"
-        [ngClass]="{ 'animate-spin': loading() }"
+        [class.animate-spin]="loading()"
         (click)="refresh()"
       >
         <mat-icon svgIcon="refresh" />
@@ -39,7 +40,6 @@
           <p>{{ element.name }}</p>
         </td>
       </ng-container>
-
       <ng-container matColumnDef="actions">
         <th mat-header-cell *matHeaderCellDef>
           <p class="w-full text-right!">Acciones</p>
@@ -63,7 +63,6 @@
           </div>
         </td>
       </ng-container>
-
       <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
       <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
     </table>

@@ -23,10 +23,8 @@
   <mat-icon
     svgIcon="circle-medium"
     [matTooltip]="nametag()"
-    [ngClass]="{
-    '!text-yellow-600': isDebit() && !isDebitWithDelay(),
-    '!text-purple-800': isDebitPartiallyPaid(),
-    '!text-red-800': isDebitWithDelay(),
-}"
+    [class.!text-yellow-600]="isDebit() && !isDebitWithDelay()"
+    [class.!text-purple-800]="isDebitPartiallyPaid()"
+    [class.!text-red-800]="isDebitWithDelay()"
   ></mat-icon>
 </div>

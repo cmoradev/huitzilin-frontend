@@ -1,5 +1,13 @@
-import { Component, inject, OnInit, output, ChangeDetectionStrategy } from '@angular/core';
-import { ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  OnInit,
+  output,
+  signal,
+} from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDialogModule } from '@angular/material/dialog';
@@ -8,56 +16,96 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { CreateAction } from '@graphql';
-import { NavItem, navItems, Permission, permissions } from '@routes';
-import { BranchToolsService, FormToolsService } from '@services';
+import {
+  NavItem,
+  Permission,
+  PermissionKey,
+  navItems,
+  permissions,
+} from '@routes';
+import { BranchToolsService } from '@services';
 import { concatMap, groupBy, mergeMap, of, toArray, zip } from 'rxjs';
+import {
+  form,
+  FormField,
+  FormRoot,
+  required,
+} from '@angular/forms/signals';
+import { ActionFormFields } from '@app/types/permissions';
 
 @Component({
   selector: 'app-action-form',
   imports: [
     MatDialogModule,
-    ReactiveFormsModule,
     MatFormFieldModule,
     MatCheckboxModule,
     MatTooltipModule,
     MatSelectModule,
     MatIconModule,
     MatButtonModule,
-    MatCheckboxModule,
+    FormField,
+    FormRoot,
   ],
   templateUrl: './action-form.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
 export class ActionFormComponent implements OnInit {
-  protected formTools = inject(FormToolsService);
   protected branchTools = inject(BranchToolsService);
 
   public save = output<CreateAction[]>();
 
   protected navigations: NavItem[] = [];
-  private _permission: Permission[] = permissions;
+  private readonly _allPermissions: Permission[] = permissions;
 
-  protected formGroup = this.formTools.builder.group({
-    id: this.formTools.builder.control<string | null>(null, {
-      nonNullable: false,
-    }),
-    route: this.formTools.builder.control<string>('', {
-      validators: [Validators.required],
-      nonNullable: true,
-    }),
-    actions: this.formTools.builder.array<string>([], {
-      validators: [Validators.required],
-    }),
-    resources: this.formTools.builder.control<string[]>([], {
-      validators: [Validators.required],
-      nonNullable: true,
-    }),
+  public readonly actionModel = signal<ActionFormFields>({
+    id: null,
+    route: '',
+    actions: [],
+    resources: [],
   });
+
+  public readonly actionForm = form(this.actionModel, (schema) => {
+    required(schema.route, { message: 'Campo requerido' });
+    required(schema.actions, { message: 'Seleccione al menos una acción' });
+    required(schema.resources, {
+      message: 'Seleccione al menos una sucursal',
+    });
+  });
+
+  protected readonly currentRoute = computed(() => this.actionModel().route);
+
+  protected readonly isGlobalRoute = computed(() => {
+    const route = navItems.find((item) => item.route === this.currentRoute());
+    return !!route?.isGlobal;
+  });
+
+  protected readonly permissions = computed(() => {
+    const route = this.currentRoute() || 'notFound';
+    return this._allPermissions.filter((p) => p.route === route);
+  });
+
+  constructor() {
+    // Restablece valores derivados al cambiar la ruta.
+    effect(() => {
+      const route = this.actionModel().route;
+      const routeItem = navItems.find((item) => item.route === route);
+
+      if (!route) {
+        return;
+      }
+
+      this.actionModel.update((m) => ({
+        ...m,
+        actions: [],
+        resources: routeItem?.isGlobal ? ['*'] : [],
+      }));
+    });
+  }
 
   ngOnInit(): void {
     this.branchTools.fetchAll();
-    
+
     of(navItems)
       .pipe(
         concatMap((res) => res),
@@ -69,71 +117,30 @@ export class ActionFormComponent implements OnInit {
 
         this.navigations.push({ section, routes });
       });
+  }
 
-    this.formGroup.get('route')?.valueChanges.subscribe({
-      next: (value) => {
-        const route = navItems.find((item) => item.route === value);
-
-        this.formGroup.get('actions')?.setValue([]);
-
-        if (!!route) {
-          this.formGroup
-            .get('resources')
-            ?.setValue(route.isGlobal ? ['*'] : []);
-        }
-      },
+  public togglePermission(permission: PermissionKey, checked: boolean): void {
+    this.actionModel.update((m) => {
+      const has = m.actions.includes(permission);
+      if (checked && !has) {
+        return { ...m, actions: [...m.actions, permission] };
+      }
+      if (!checked && has) {
+        return {
+          ...m,
+          actions: m.actions.filter((p) => p !== permission),
+        };
+      }
+      return m;
     });
   }
 
-  public saveData() {
-    if (this.formGroup.valid) {
-      const values = this.formGroup.getRawValue();
-      console.log(values);
-
-      // if (this.isGlobalRoute) {
-      //   this.save.emit([
-      //     {
-      //       id: values.id,
-      //       actions: values.actions,
-      //       resources: '*',
-      //       route: values.route,
-      //     },
-      //   ]);
-      // } else {
-      //   this.save.emit(
-      //     values.resources.map((resource) => ({
-      //       id: values.id,
-      //       actions: values.actions,
-      //       resources: resource,
-      //       route: values.route,
-      //     }))
-      //   );
-      // }
+  public saveData(): void {
+    if (this.actionForm().invalid()) {
+      return;
     }
-  }
 
-  get withRoute() {
-    return !!this.formGroup.get('route')?.value;
-  }
-
-  get isGlobalRoute() {
-    const route = navItems.find(
-      (item) => item.route === this.formGroup.get('route')?.value
-    );
-
-    return !!route?.isGlobal;
-  }
-
-  get permissions() {
-    const route = this.formGroup.get('route')?.value || 'notFound';
-
-    return this._permission.filter((permission) => permission.route === route);
+    const values = this.actionModel();
+    console.log(values);
   }
 }
-
-export type PermissionFormValues = {
-  id: string | null;
-  route: string;
-  actions: string[];
-  resources: string[];
-};

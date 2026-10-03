@@ -14,7 +14,8 @@
             <input
               matInput
               placeholder="Ej. Taekwondo"
-              [formControl]="searchControl"
+              [value]="searchTerm()"
+              (input)="searchTerm.set($any($event.target).value)"
             />
           </mat-form-field>
           <button

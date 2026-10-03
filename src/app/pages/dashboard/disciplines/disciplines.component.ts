@@ -1,5 +1,11 @@
-import { Component, inject, signal, ViewChild, ChangeDetectionStrategy } from '@angular/core';
-import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  effect,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { MatCardModule } from '@angular/material/card';
 import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -13,17 +19,16 @@ import {
   GetDisciplinesPageGQL,
 } from '@graphql';
 import { GlobalStateService } from '@services';
-import { debounceTime, merge, startWith } from 'rxjs';
+import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { debounceTime } from 'rxjs';
 import { DisciplineDeleteDialogComponent } from './discipline-delete-dialog/discipline-delete-dialog.component';
 import { DisciplineFormDialogComponent } from './discipline-form-dialog/discipline-form-dialog.component';
-import { NgClass } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
 import { MatTooltipModule } from '@angular/material/tooltip';
 
 @Component({
   selector: 'app-disciplines',
   imports: [
-    NgClass,
     MatCardModule,
     MatTableModule,
     MatFormFieldModule,
@@ -32,15 +37,14 @@ import { MatTooltipModule } from '@angular/material/tooltip';
     MatIconModule,
     MatPaginatorModule,
     MatTooltipModule,
-    ReactiveFormsModule,
   ],
   templateUrl: './disciplines.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
 export class DisciplinesComponent {
-  @ViewChild('paginator') public paginator!: MatPaginator;
-  public searchControl = new FormControl('');
+  public readonly paginator = viewChild.required<MatPaginator>('paginator');
+  public readonly searchTerm = signal('');
 
   public displayedColumns: string[] = ['name', 'actions'];
   public dataSource = new MatTableDataSource<DisciplinePartsFragment>([]);
@@ -52,18 +56,66 @@ export class DisciplinesComponent {
   private readonly _disciplinesPageGQL = inject(GetDisciplinesPageGQL);
   private readonly _globalStateService = inject(GlobalStateService);
 
-  ngAfterViewInit(): void {
-    merge(
-      this.paginator.page,
-      this.searchControl.valueChanges,
-      this._globalStateService.branch$
-    )
-      .pipe(debounceTime(300), startWith({}))
-      .subscribe({
-        next: () => {
-          this.refresh();
-        },
-      });
+  private readonly _branch = toSignal(this._globalStateService.branch$, {
+    initialValue: this._globalStateService.branch,
+  });
+
+  private readonly _debouncedSearchTerm = signal('');
+
+  constructor() {
+    toObservable(this.searchTerm)
+      .pipe(debounceTime(300))
+      .subscribe((term) => this._debouncedSearchTerm.set(term));
+
+    effect(() => {
+      const branch = this._branch();
+      const paginator = this.paginator();
+      const filter = this._buildFilter(this._debouncedSearchTerm());
+
+      if (!branch?.id || !filter) {
+        return;
+      }
+
+      const limit = paginator.pageSize;
+      const offset = paginator.pageIndex * limit;
+
+      this._disciplinesPageGQL
+        .watch({
+          variables: { limit, offset, filter },
+          fetchPolicy: 'cache-and-network',
+          nextFetchPolicy: 'cache-and-network',
+          notifyOnNetworkStatusChange: true,
+        })
+        .valueChanges.subscribe({
+          next: ({ data, loading }) => {
+            const disciplines = data?.disciplines;
+            const nodes = (disciplines?.nodes ??
+              []) as DisciplinePartsFragment[];
+            const totalCount = disciplines?.totalCount ?? 0;
+
+            this.dataSource.data = nodes;
+
+            this.loading.set(loading);
+            this.totalCount.set(totalCount);
+          },
+        });
+    });
+  }
+
+  private _buildFilter(term: string): DisciplineFilter | null {
+    const branch = this._globalStateService.branch;
+    if (!branch?.id) {
+      return null;
+    }
+
+    return {
+      name: { iLike: `%${term}%` },
+      branchId: { eq: branch.id },
+    };
+  }
+
+  public onSearchInput(event: Event): void {
+    this.searchTerm.set((event.target as HTMLInputElement).value);
   }
 
   public openFormDialog(
@@ -96,36 +148,36 @@ export class DisciplinesComponent {
     });
   }
 
-  public refresh() {
-    if (this._globalStateService.branch?.id) {
-      const limit: number = this.paginator.pageSize;
-      const offset: number = this.paginator.pageIndex * limit;
+  public refresh(): void {
+    const paginator = this.paginator();
+    const filter = this._buildFilter(this.searchTerm());
 
-      const filter: DisciplineFilter = {
-        name: { iLike: `%${this.searchControl.value}%` },
-        branchId: { eq: this._globalStateService.branch!.id },
-      };
-
-      this._disciplinesPageGQL
-        .watch({
-          variables: { limit, offset, filter },
-          fetchPolicy: 'cache-and-network',
-          nextFetchPolicy: 'cache-and-network',
-          notifyOnNetworkStatusChange: true,
-        })
-        .valueChanges.subscribe({
-          next: ({ data, loading }) => {
-            const disciplines = data?.disciplines;
-            const nodes = (disciplines?.nodes ??
-              []) as DisciplinePartsFragment[];
-            const totalCount = disciplines?.totalCount ?? 0;
-
-            this.dataSource.data = nodes;
-
-            this.loading.set(loading);
-            this.totalCount.set(totalCount);
-          },
-        });
+    if (!filter) {
+      return;
     }
+
+    const limit = paginator.pageSize;
+    const offset = paginator.pageIndex * limit;
+
+    this._disciplinesPageGQL
+      .watch({
+        variables: { limit, offset, filter },
+        fetchPolicy: 'cache-and-network',
+        nextFetchPolicy: 'cache-and-network',
+        notifyOnNetworkStatusChange: true,
+      })
+      .valueChanges.subscribe({
+        next: ({ data, loading }) => {
+          const disciplines = data?.disciplines;
+          const nodes = (disciplines?.nodes ??
+            []) as DisciplinePartsFragment[];
+          const totalCount = disciplines?.totalCount ?? 0;
+
+          this.dataSource.data = nodes;
+
+          this.loading.set(loading);
+          this.totalCount.set(totalCount);
+        },
+      });
   }
 }

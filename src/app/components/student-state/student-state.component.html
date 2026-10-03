@@ -6,15 +6,20 @@
       type="text"
       placeholder="Ej. Jhon Doe"
       matInput
-      [formControl]="studentControl"
+      [value]="studentQuery()"
+      (input)="onSearchInput($event)"
       [matAutocomplete]="autoStudents"
     />
-    @if (studentControl.value) {
-    <button mat-icon-button matSuffix (click)="studentControl.setValue('')">
+    @if (studentQuery()) {
+    <button mat-icon-button matSuffix (click)="studentQuery.set('')">
       <mat-icon svgIcon="close" />
     </button>
     }
-    <mat-autocomplete #autoStudents="matAutocomplete" [displayWith]="displayFn">
+    <mat-autocomplete
+      #autoStudents="matAutocomplete"
+      [displayWith]="displayFn"
+      (optionSelected)="onStudentSelected($event.option.value)"
+    >
       @for (student of students(); track student.id) {
       <mat-option [value]="student">
         <div class="flex items-center gap-2">
@@ -34,7 +39,7 @@
 } @else if (student()) {
 <div
   class="p-2 cursor-pointer rounded-[var(--mat-sys-corner-medium)]"
-  (click)="toggleStudent(); studentControl.setValue('')"
+  (click)="toggleStudent(); studentQuery.set('')"
   matRipple
 >
   <div class="flex items-center gap-2">

@@ -1,30 +1,47 @@
 <h2 mat-dialog-title>{{ !!data?.id ? "Actualizar" : "Crear" }} estudiante</h2>
 <mat-dialog-content>
-  <form id="dataForm" [formGroup]="formGroup" (ngSubmit)="submit()">
+  <form id="dataForm" [formRoot]="studentForm" (submit)="submit()">
     <div class="flex flex-col gap-3">
-      <app-image-picker formControlName="picture"></app-image-picker>
+      <app-image-picker [formField]="studentForm.picture"></app-image-picker>
+      @if (studentForm.picture().touched() && studentForm.picture().invalid()) {
+        <mat-error class="text-red-500 text-sm">
+          {{ studentForm.picture().errors()[0].message }}
+        </mat-error>
+      }
 
-      <mat-checkbox formControlName="active">
+      <mat-checkbox [formField]="studentForm.active">
         ¿Estudiante activo?
       </mat-checkbox>
 
       <div class="grid grid-cols-2 gap-3">
         <mat-form-field>
           <mat-label>Nombre</mat-label>
-          <input matInput placeholder="Ej: Juan" formControlName="firstname" />
+          <input
+            matInput
+            placeholder="Ej: Juan"
+            [formField]="studentForm.firstname"
+          />
           <mat-hint>Ingrese el nombre</mat-hint>
-          <mat-error>
-            {{ formTools.checkForErrorsIn(formGroup.get("firstname")) }}
-          </mat-error>
+          @if (studentForm.firstname().touched() && studentForm.firstname().invalid()) {
+            <mat-error>
+              {{ studentForm.firstname().errors()[0].message }}
+            </mat-error>
+          }
         </mat-form-field>
 
         <mat-form-field>
           <mat-label>Apellido</mat-label>
-          <input matInput placeholder="Ej: Pérez" formControlName="lastname" />
+          <input
+            matInput
+            placeholder="Ej: Pérez"
+            [formField]="studentForm.lastname"
+          />
           <mat-hint>Ingrese el apellido</mat-hint>
-          <mat-error>
-            {{ formTools.checkForErrorsIn(formGroup.get("lastname")) }}
-          </mat-error>
+          @if (studentForm.lastname().touched() && studentForm.lastname().invalid()) {
+            <mat-error>
+              {{ studentForm.lastname().errors()[0].message }}
+            </mat-error>
+          }
         </mat-form-field>
 
         <mat-form-field>
@@ -32,12 +49,17 @@
           <input
             matInput
             placeholder="Ej: D123-456-7890-123"
-            formControlName="dni"
+            [formField]="studentForm.dni"
           />
           <mat-hint>Clave de identidad nacional</mat-hint>
-          <mat-error>
-            {{ formTools.checkForErrorsIn(formGroup.get("dni")) }}
-          </mat-error>
+          @if (studentForm.dni().touched() && studentForm.dni().invalid()) {
+            <mat-error>
+              {{ studentForm.dni().errors()[0].message }}
+            </mat-error>
+          }
+          @if (studentForm.dni().pending()) {
+            <mat-hint>Verificando disponibilidad...</mat-hint>
+          }
         </mat-form-field>
 
         <mat-form-field>
@@ -45,7 +67,7 @@
           <input
             matInput
             [matDatepicker]="datepicker"
-            formControlName="dateBirth"
+            [formField]="studentForm.dateBirth"
           />
           <mat-hint>Fecha de nacimiento</mat-hint>
           <mat-datepicker-toggle
@@ -53,15 +75,17 @@
             [for]="datepicker"
           ></mat-datepicker-toggle>
           <mat-datepicker #datepicker> </mat-datepicker>
-          <mat-error>
-            {{ formTools.checkForErrorsIn(formGroup.get("dateBirth")) }}
-          </mat-error>
+          @if (studentForm.dateBirth().touched() && studentForm.dateBirth().invalid()) {
+            <mat-error>
+              {{ studentForm.dateBirth().errors()[0].message }}
+            </mat-error>
+          }
         </mat-form-field>
       </div>
 
       <mat-form-field class="w-full">
         <mat-label>Sucursal</mat-label>
-        <mat-select formControlName="branchIds" multiple>
+        <mat-select [formField]="studentForm.branchIds" multiple>
           @for (branch of branchTools.options(); track $index) {
           <mat-option [value]="branch.id">
             <div class="flex items-center gap-2">
@@ -71,7 +95,12 @@
           </mat-option>
           }
         </mat-select>
-        <mat-hint> Seleccione las sucursales </mat-hint>
+        <mat-hint>Seleccione las sucursales</mat-hint>
+        @if (studentForm.branchIds().touched() && studentForm.branchIds().invalid()) {
+          <mat-error>
+            {{ studentForm.branchIds().errors()[0].message }}
+          </mat-error>
+        }
       </mat-form-field>
     </div>
   </form>

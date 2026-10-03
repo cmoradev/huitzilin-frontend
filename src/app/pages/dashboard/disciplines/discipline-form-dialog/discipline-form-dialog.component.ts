@@ -1,5 +1,13 @@
-import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
-import { ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  linkedSignal,
+  OnInit,
+  signal,
+} from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import {
   MAT_DIALOG_DATA,
@@ -13,8 +21,6 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import {
   CreateOneDisciplineGQL,
   DisciplinePartsFragment,
-  GetLevelsPageGQL,
-  GetLevelsPageQueryVariables,
   GetPackagePageGQL,
   GetPackagePageQueryVariables,
   LevelPartsFragment,
@@ -22,8 +28,17 @@ import {
   UpdateOneDisciplineGQL,
 } from '@graphql';
 import { PackageKindPipe } from '@pipes';
-import { FormToolsService, GlobalStateService } from '@services';
-import { map } from 'rxjs';
+import { GlobalStateService } from '@services';
+import {
+  form,
+  FormField,
+  FormRoot,
+  maxLength,
+  min,
+  required,
+} from '@angular/forms/signals';
+import { firstValueFrom, map } from 'rxjs';
+import { DisciplineFormFields } from '@app/types/disciplines';
 
 @Component({
   selector: 'app-discipline-form-dialog',
@@ -33,16 +48,15 @@ import { map } from 'rxjs';
     MatInputModule,
     MatFormFieldModule,
     MatSelectModule,
-    ReactiveFormsModule,
+    FormField,
+    FormRoot,
     PackageKindPipe,
   ],
   templateUrl: './discipline-form-dialog.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
-export class DisciplineFormDialogComponent {
-  public readonly formTools = inject(FormToolsService);
-
+export class DisciplineFormDialogComponent implements OnInit {
   public loading = signal<boolean>(false);
   public data: DisciplinePartsFragment | null = inject(MAT_DIALOG_DATA);
 
@@ -57,155 +71,145 @@ export class DisciplineFormDialogComponent {
 
   public packages = signal<PackagePartsFragment[]>([]);
 
-  public formGroup = this.formTools.builder.group({
-    name: this.formTools.builder.control('', {
-      validators: [Validators.required, Validators.maxLength(32)],
-      nonNullable: true,
-    }),
-    minHours: this.formTools.builder.control(1, {
-      validators: [Validators.required],
-      nonNullable: true,
-    }),
-    packages: this.formTools.builder.control<string[]>([], {
-      validators: [],
-      nonNullable: true,
-    }),
+  public readonly isEditing = computed(() => !!this.data?.id);
+
+  private readonly _initialModel = computed<DisciplineFormFields>(() => ({
+    name: this.data?.name ?? '',
+    minHours: this.data?.minHours ?? 1,
+    packages: this.data?.packages.map((pkg) => pkg.id) ?? [],
+  }));
+
+  public readonly disciplineModel = linkedSignal<
+    DisciplineFormFields,
+    DisciplineFormFields
+  >({
+    source: this._initialModel,
+    computation: (initial) => ({ ...initial }),
   });
+
+  public readonly disciplineForm = form(this.disciplineModel, (schema) => {
+    required(schema.name, { message: 'Campo requerido' });
+    maxLength(schema.name, 32, { message: 'Máximo 32 caracteres' });
+    required(schema.minHours, { message: 'Campo requerido' });
+    min(schema.minHours, 1, { message: 'Mínimo 1 hora' });
+    required(schema.packages, { message: 'Seleccione al menos un paquete' });
+  });
+
+  constructor() {
+    effect(() => {
+      this._dialogRef.disableClose = this.loading();
+    });
+  }
 
   ngOnInit(): void {
     this._fetchAllPackages();
-
-    if (!!this.data?.id) {
-      this.formGroup.patchValue({
-        name: this.data.name,
-        minHours: this.data.minHours,
-        packages: this.data.packages.map((pkg) => pkg.id),
-      });
-    }
   }
 
   public async submit(): Promise<void> {
-    if (this.formGroup.valid) {
-      this.loading.set(true);
+    if (this.disciplineForm().invalid()) {
+      return;
+    }
 
-      const values = this.formGroup.getRawValue();
+    const values = this.disciplineModel();
+    this.loading.set(true);
 
-      if (!!this.data?.id) {
-        this._update(values).subscribe({
-          next: (cycle) => {
-            this._dialogRef.close(cycle);
-            this._snackBar.open('Se ha actualizado correctamente', 'Cerrar', {
-              duration: 1000,
-              horizontalPosition: 'center',
-              verticalPosition: 'bottom',
-            });
-          },
-          error: (err) => {
-            console.error('UPDATE CYCLE ERROR: ', err);
-          },
-          complete: () => {
-            this.loading.set(false);
-          },
+    try {
+      if (this.isEditing()) {
+        const updated = await firstValueFrom(
+          this._updateOneDiscipline.mutate({
+            variables: {
+              id: this.data!.id,
+              update: {
+                name: values.name,
+                minHours: values.minHours,
+                packages: values.packages.map((id) => ({ id })),
+              },
+            },
+          })
+        );
+
+        this._dialogRef.close(updated.data?.updateOneDiscipline);
+        this._snackBar.open('Se ha actualizado correctamente', 'Cerrar', {
+          duration: 1000,
+          horizontalPosition: 'center',
+          verticalPosition: 'bottom',
         });
       } else if (this._globalStateService.branch?.id) {
-        this._save(values).subscribe({
-          next: (cycle) => {
-            this._dialogRef.close(cycle);
-            this._snackBar.open('Se ha creado correctamente', 'Cerrar', {
-              duration: 1000,
-              horizontalPosition: 'center',
-              verticalPosition: 'bottom',
-            });
-          },
-          error: (err) => {
-            console.error('CREATE CYCLE ERROR: ', err);
-          },
-          complete: () => {
-            this.loading.set(false);
-          },
+        const created = await firstValueFrom(
+          this._createOneDiscipline.mutate({
+            variables: {
+              discipline: {
+                name: values.name,
+                minHours: values.minHours,
+                packages: values.packages.map((id) => ({ id })),
+                branchId: this._globalStateService.branch!.id,
+              },
+            },
+          })
+        );
+
+        this._dialogRef.close(created.data?.createOneDiscipline);
+        this._snackBar.open('Se ha creado correctamente', 'Cerrar', {
+          duration: 1000,
+          horizontalPosition: 'center',
+          verticalPosition: 'bottom',
         });
       }
+    } catch (err) {
+      console.error(
+        this.isEditing() ? 'UPDATE DISCIPLINE ERROR: ' : 'CREATE DISCIPLINE ERROR: ',
+        err
+      );
+    } finally {
+      this.loading.set(false);
     }
   }
 
-  private _update(values: FormValues) {
-    return this._updateOneDiscipline
-      .mutate({
-        variables: {
-          id: this.data!.id,
-          update: {
-            name: values.name,
-            minHours: values.minHours,
-            packages: values.packages!.map((id) => ({ id })),
-          },
-        },
-      })
-      .pipe(map((value) => value.data?.updateOneDiscipline));
-  }
-
-  private _save(values: FormValues) {
-    return this._createOneDiscipline
-      .mutate({
-        variables: {
-          discipline: {
-            name: values.name,
-            minHours: values.minHours,
-            packages: values.packages!.map((id) => ({ id })),
-            branchId: this._globalStateService.branch!.id,
-          },
-        },
-      })
-      .pipe(map((value) => value.data?.createOneDiscipline));
-  }
-
-  private _fetchAllPackages(accumulared: PackagePartsFragment[] = []): void {
-    if (!!this._globalStateService.branch?.id) {
-      const limit = 50;
-      const offset = accumulared.length;
-
-      const params: GetPackagePageQueryVariables = {
-        filter: { branchId: { eq: this._globalStateService.branch!.id } },
-        limit,
-        offset,
-      };
-
-      const getPackages$ = this._getPackagesPage
-        .watch({
-          variables: params,
-          fetchPolicy: 'cache-and-network', // Usa cache primero, solo pide a la API si no hay datos en cache
-          nextFetchPolicy: 'cache-and-network', // Mantiene la política de cache en siguientes peticiones
-          notifyOnNetworkStatusChange: false, // No notifica cambios de red para evitar refetch innecesario
-        })
-        .valueChanges;
-
-      getPackages$.pipe(map((resp) => resp.data?.packages)).subscribe({
-        next: (packages) => {
-          if (!packages) return;
-
-          const nodes = (packages.nodes ?? []) as PackagePartsFragment[];
-          const totalCount = packages.totalCount ?? 0;
-
-          const allItems = accumulared.concat(nodes);
-
-          if (allItems.length >= totalCount) {
-            this.packages.set(allItems);
-            return; // No more fees to fetch
-          }
-
-          this._fetchAllPackages(allItems);
-        },
-        error: (error) => {
-          console.error('Error fetching fees', error);
-        },
-      });
-    } else {
-      this.packages.set([]);
+  private _fetchAllPackages(
+    accumulated: PackagePartsFragment[] = []
+  ): void {
+    const branch = this._globalStateService.branch;
+    if (!branch?.id) {
+      return;
     }
+
+    const limit = 50;
+    const offset = accumulated.length;
+
+    const params: GetPackagePageQueryVariables = {
+      filter: { branchId: { eq: branch.id } },
+      limit,
+      offset,
+    };
+
+    const getPackages$ = this._getPackagesPage
+      .watch({
+        variables: params,
+        fetchPolicy: 'cache-and-network',
+        nextFetchPolicy: 'cache-and-network',
+        notifyOnNetworkStatusChange: false,
+      })
+      .valueChanges;
+
+    getPackages$.pipe(map((resp) => resp.data?.packages)).subscribe({
+      next: (packages) => {
+        if (!packages) return;
+
+        const nodes = (packages.nodes ?? []) as PackagePartsFragment[];
+        const totalCount = packages.totalCount ?? 0;
+
+        const allItems = accumulated.concat(nodes);
+
+        if (allItems.length >= totalCount) {
+          this.packages.set(allItems);
+          return;
+        }
+
+        this._fetchAllPackages(allItems);
+      },
+      error: (error) => {
+        console.error('Error fetching packages', error);
+      },
+    });
   }
 }
-
-type FormValues = {
-  name: string;
-  minHours: number;
-  packages: string[];
-};

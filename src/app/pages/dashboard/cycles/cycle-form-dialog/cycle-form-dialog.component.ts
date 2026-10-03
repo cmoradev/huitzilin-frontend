@@ -1,5 +1,12 @@
-import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
-import { ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  linkedSignal,
+  signal,
+} from '@angular/core';
 import { MatButton, MatButtonModule } from '@angular/material/button';
 import {
   MAT_DIALOG_DATA,
@@ -18,8 +25,16 @@ import {
   CyclePartsFragment,
   UpdateOneCycleGQL,
 } from '@graphql';
-import { FormToolsService, GlobalStateService } from '@services';
-import { map } from 'rxjs';
+import { firstValueFrom } from 'rxjs';
+import {
+  form,
+  FormField,
+  FormRoot,
+  maxLength,
+  required,
+  validateTree,
+} from '@angular/forms/signals';
+import { CycleFormFields } from '@app/types/cycles';
 
 @Component({
   selector: 'app-cycle-form-dialog',
@@ -29,15 +44,14 @@ import { map } from 'rxjs';
     MatInputModule,
     MatFormFieldModule,
     MatDatepickerModule,
-    ReactiveFormsModule,
+    FormField,
+    FormRoot,
   ],
   templateUrl: './cycle-form-dialog.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
 export class CycleFormDialogComponent {
-  public readonly formTools = inject(FormToolsService);
-
   public loading = signal(false);
   public data: CyclePartsFragment | null = inject(MAT_DIALOG_DATA);
 
@@ -46,93 +60,103 @@ export class CycleFormDialogComponent {
 
   private readonly _dialogRef = inject(MatDialogRef<CycleFormDialogComponent>);
 
-  public formGroup = this.formTools.builder.group(
-    {
-      name: ['', [Validators.required, Validators.maxLength(16)]],
-      start: ['', [Validators.required]],
-      end: ['', [Validators.required]],
-    },
-    {
-      validators: [this.formTools.isEndDateAfterStartDate],
-    }
-  );
+  public readonly isEditing = computed(() => !!this.data?.id);
 
-  ngOnInit(): void {
-    if (!!this.data?.id) {
-      this.formGroup.patchValue({
-        name: this.data.name,
-        start: `${this.data.start}T12:00:00`,
-        end: `${this.data.end}T12:00:00`,
-      });
-    }
+  private readonly _initialModel = computed<CycleFormFields>(() => ({
+    name: this.data?.name ?? '',
+    start: this.data?.start ?? '',
+    end: this.data?.end ?? '',
+  }));
+
+  public readonly cycleModel = linkedSignal<CycleFormFields, CycleFormFields>({
+    source: this._initialModel,
+    computation: (initial) => ({ ...initial }),
+  });
+
+  public readonly cycleForm = form(this.cycleModel, (schema) => {
+    required(schema.name, { message: 'Campo requerido' });
+    maxLength(schema.name, 16, { message: 'Máximo 16 caracteres' });
+    required(schema.start, { message: 'Seleccione fecha de inicio' });
+    required(schema.end, { message: 'Seleccione fecha de fin' });
+
+    validateTree(schema, ({ valueOf }) => {
+      const start = valueOf(schema.start);
+      const end = valueOf(schema.end);
+      if (start && end && new Date(start) >= new Date(end)) {
+        return {
+          kind: 'endDateInvalid',
+          message:
+            'La fecha de finalización debe ser mayor a la fecha de inicio',
+          fieldTree: this.cycleForm.end,
+        };
+      }
+      return null;
+    });
+  });
+
+  constructor() {
+    effect(() => {
+      this._dialogRef.disableClose = this.loading();
+    });
   }
 
   public async submit(): Promise<void> {
-    if (this.formGroup.valid) {
-      this.loading.set(true);
+    if (this.cycleForm().invalid()) {
+      return;
+    }
 
-      const values = this.formGroup.getRawValue() as any;
+    const values = this.cycleModel();
+    this.loading.set(true);
 
-      if (!!this.data?.id) {
-        this._update(values).subscribe({
-          next: (cycle) => {
-            this._dialogRef.close(cycle);
-          },
-          error: (err) => {
-            console.error('UPDATE CYCLE ERROR: ', err);
-          },
-          complete: () => {
-            this.loading.set(false);
-          },
-        });
-      } else {
-        this._save(values).subscribe({
-          next: (cycle) => {
-            this._dialogRef.close(cycle);
-          },
-          error: (err) => {
-            console.error('CREATE CYCLE ERROR: ', err);
-          },
-          complete: () => {
-            this.loading.set(false);
-          },
-        });
-      }
+    try {
+      const cycle = this.isEditing()
+        ? await this._update(values)
+        : await this._save(values);
+
+      this._dialogRef.close(cycle);
+    } catch (err) {
+      console.error(
+        this.isEditing() ? 'UPDATE CYCLE ERROR: ' : 'CREATE CYCLE ERROR: ',
+        err
+      );
+    } finally {
+      this.loading.set(false);
     }
   }
 
-  private _update(values: FormValues) {
-    return this._updateOneCycle
-      .mutate({
+  private async _update(values: CycleFormFields) {
+    const updated = await firstValueFrom(
+      this._updateOneCycle.mutate({
         variables: {
           id: this.data!.id,
-          update: {
-            ...values,
-            start: new Date(values.start).toISOString(),
-            end: new Date(values.end).toISOString(),
-          },
+          update: this._buildPayload(values),
         },
       })
-      .pipe(map((value) => value.data?.updateOneCycle));
+    );
+
+    return updated.data?.updateOneCycle;
   }
 
-  private _save(values: FormValues) {
-    return this._createOneCycle
-      .mutate({
+  private async _save(values: CycleFormFields) {
+    const created = await firstValueFrom(
+      this._createOneCycle.mutate({
         variables: {
-          cycle: {
-            ...values,
-            start: new Date(values.start).toISOString(),
-            end: new Date(values.end).toISOString(),
-          },
+          cycle: this._buildPayload(values),
         },
       })
-      .pipe(map((value) => value.data?.createOneCycle));
+    );
+
+    return created.data?.createOneCycle;
+  }
+
+  private _buildPayload(values: CycleFormFields) {
+    return {
+      name: values.name,
+      // 'T12:00:00' (mediodía local) evita que `new Date('YYYY-MM-DD')`
+      // se interprete como medianoche UTC y recorra un día hacia atrás
+      // en zonas horarias negativas.
+      start: new Date(`${values.start}T12:00:00`).toISOString(),
+      end: new Date(`${values.end}T12:00:00`).toISOString(),
+    };
   }
 }
-
-type FormValues = {
-  name: string;
-  start: string;
-  end: string;
-};

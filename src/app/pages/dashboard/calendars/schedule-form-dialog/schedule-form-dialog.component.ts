@@ -1,6 +1,13 @@
-import { NgClass } from '@angular/common';
-import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
-import { ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  linkedSignal,
+  OnInit,
+  signal,
+} from '@angular/core';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatButtonModule } from '@angular/material/button';
 import {
@@ -24,14 +31,29 @@ import {
 } from '@graphql';
 import {
   DisciplineToolsService,
-  FormToolsService,
   GlobalStateService,
   LevelToolsService,
   TeacherToolsService,
 } from '@services';
 import { daysOfWeek } from '@utils/contains';
 import { isUUID } from '@utils/helpers';
-import { filter, map } from 'rxjs';
+import { firstValueFrom } from 'rxjs';
+import {
+  form,
+  FormField,
+  FormRoot,
+  maxLength,
+  required,
+} from '@angular/forms/signals';
+
+interface ScheduleFormFields {
+  day: string;
+  start: string;
+  end: string;
+  levels: string[];
+  teacher: TeacherPartsFragment | null;
+  discipline: DisciplinePartsFragment | null;
+}
 
 @Component({
   selector: 'app-schedule-form-dialog',
@@ -43,17 +65,15 @@ import { filter, map } from 'rxjs';
     MatFormFieldModule,
     MatSelectModule,
     MatTimepickerModule,
-    ReactiveFormsModule,
+    FormField,
+    FormRoot,
     MatAutocompleteModule,
-    NgClass,
   ],
   templateUrl: './schedule-form-dialog.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
-export class ScheduleFormDialogComponent {
-  public readonly formTools = inject(FormToolsService);
-
+export class ScheduleFormDialogComponent implements OnInit {
   public loading = signal<boolean>(false);
   public removeLoading = signal<boolean>(false);
   public data: SchedulePartsFragment | null = inject(MAT_DIALOG_DATA);
@@ -74,181 +94,187 @@ export class ScheduleFormDialogComponent {
   public disciplineTools = inject(DisciplineToolsService);
   public teacherTools = inject(TeacherToolsService);
 
-  public formGroup = this.formTools.builder.group({
-    day: this.formTools.builder.control<string>('', {
-      validators: [Validators.required, Validators.maxLength(32)],
-      nonNullable: true,
-    }),
-    start: this.formTools.builder.control<Date>(new Date(2025, 5, 15, 8, 0), {
-      validators: [Validators.required],
-      nonNullable: true,
-    }),
-    end: this.formTools.builder.control<Date>(new Date(2025, 5, 15, 20, 0), {
-      validators: [Validators.required],
-      nonNullable: true,
-    }),
-    levels: this.formTools.builder.control<string[]>([], {
-      validators: [],
-      nonNullable: true,
-    }),
-    teacher: this.formTools.builder.control<TeacherPartsFragment | null>(null, {
-      validators: [Validators.required],
-      nonNullable: true,
-    }),
-    discipline: this.formTools.builder.control<DisciplinePartsFragment | null>(
-      null,
-      {
-        validators: [Validators.required],
-        nonNullable: true,
-      }
-    ),
+  public readonly isEditing = computed(() => !!this.data?.id);
+
+  private readonly _initialModel = computed<ScheduleFormFields>(() => ({
+    day: this.data?.day?.toString() ?? '',
+    start: this.data?.start
+      ? new Date(this.data.start).toTimeString().slice(0, 5)
+      : '08:00',
+    end: this.data?.end
+      ? new Date(this.data.end).toTimeString().slice(0, 5)
+      : '20:00',
+    levels: this.data?.levels?.map((level) => level.id) ?? [],
+    teacher: (this.data?.teacher ?? null) as TeacherPartsFragment | null,
+    discipline: (this.data?.discipline ?? null) as DisciplinePartsFragment | null,
+  }));
+
+  public readonly scheduleModel = linkedSignal<
+    ScheduleFormFields,
+    ScheduleFormFields
+  >({
+    source: this._initialModel,
+    computation: (initial) => ({ ...initial }),
   });
+
+  public readonly scheduleForm = form(this.scheduleModel, (schema) => {
+    required(schema.day, { message: 'Campo requerido' });
+    maxLength(schema.day, 32, { message: 'Máximo 32 caracteres' });
+    required(schema.start, { message: 'Seleccione una hora' });
+    required(schema.end, { message: 'Seleccione una hora' });
+    required(schema.teacher, { message: 'Seleccione un docente' });
+    required(schema.discipline, { message: 'Seleccione una disciplina' });
+    required(schema.levels, { message: 'Seleccione al menos un nivel' });
+  });
+
+  // Mantiene sincronizado el término de búsqueda libre para la disciplina.
+  private readonly _disciplineSearchTerm = signal('');
+
+  constructor() {
+    effect(() => {
+      this._dialogRef.disableClose = this.loading();
+    });
+
+    effect(() => {
+      const term = this._disciplineSearchTerm();
+      if (term && !isUUID(term)) {
+        this.disciplineTools.fetch(term);
+      }
+    });
+  }
 
   ngOnInit(): void {
     this.levelTools.fetchAll();
     this.disciplineTools.fetchAll();
     this.teacherTools.fetchAll();
+  }
 
-    if (!!this.data?.day)
-      this.formGroup.patchValue({ day: this.data.day.toFixed() });
-    if (!!this.data?.start)
-      this.formGroup.patchValue({ start: new Date(this.data.start) });
-    if (!!this.data?.end)
-      this.formGroup.patchValue({ end: new Date(this.data.end) });
+  public onDisciplineInput(value: string): void {
+    this._disciplineSearchTerm.set(value);
+  }
 
-    if (!!this.data?.id) {
-      this.formGroup.patchValue({
-        discipline: this.data.discipline as any,
-        teacher: this.data.teacher as any,
-        levels: this.data.levels!.map((level) => level.id),
-      });
-    }
+  public onDisciplineSelected(discipline: DisciplinePartsFragment): void {
+    this.scheduleModel.update((m) => ({ ...m, discipline }));
+    this.scheduleForm.discipline().value.set(discipline);
+    this._disciplineSearchTerm.set('');
+  }
 
-    this.formGroup
-      .get('discipline')
-      ?.valueChanges.pipe(
-        filter((value) => typeof value === 'string'),
-        filter((value) => !isUUID(value))
-      )
-      .subscribe({
-        next: (value) => this.disciplineTools.fetch(value),
-      });
+  public clearDiscipline(): void {
+    this.scheduleModel.update((m) => ({ ...m, discipline: null }));
+    this.scheduleForm.discipline().value.set(null);
+    this._disciplineSearchTerm.set('');
+  }
+
+  public onTeacherSelected(teacher: TeacherPartsFragment): void {
+    this.scheduleModel.update((m) => ({ ...m, teacher }));
+    this.scheduleForm.teacher().value.set(teacher);
+  }
+
+  public clearTeacher(): void {
+    this.scheduleModel.update((m) => ({ ...m, teacher: null }));
+    this.scheduleForm.teacher().value.set(null);
+  }
+
+  public displayTeacher(value: TeacherPartsFragment | null): string {
+    return value?.fullname ?? '';
+  }
+
+  public displayDiscipline(value: DisciplinePartsFragment | null): string {
+    return value?.name ?? '';
   }
 
   public async submit(): Promise<void> {
-    if (this.formGroup.valid) {
-      this.loading.set(true);
+    if (this.scheduleForm().invalid()) {
+      return;
+    }
 
-      const values = this.formGroup.getRawValue();
+    const values = this.scheduleModel();
+    this.loading.set(true);
 
-      if (!!this.data?.id) {
-        this._update(values).subscribe({
-          next: (cycle) => {
-            this._dialogRef.close(cycle);
-            this._snackBar.open('Se ha actualizado correctamente', 'Cerrar', {
-              duration: 1000,
-              horizontalPosition: 'center',
-              verticalPosition: 'bottom',
-            });
-          },
-          error: (err) => {
-            console.error('UPDATE SCHEDULE ERROR: ', err);
-          },
-          complete: () => {
-            this.loading.set(false);
-          },
+    try {
+      if (this.isEditing()) {
+        const updated = await firstValueFrom(
+          this._updateOneSchedule.mutate({
+            variables: {
+              id: this.data!.id,
+              update: this._buildPayload(values),
+            },
+          })
+        );
+
+        this._dialogRef.close(updated.data?.updateOneSchedule);
+        this._snackBar.open('Se ha actualizado correctamente', 'Cerrar', {
+          duration: 1000,
+          horizontalPosition: 'center',
+          verticalPosition: 'bottom',
         });
       } else if (this._globalStateService.branch?.id) {
-        this._save(values).subscribe({
-          next: (cycle) => {
-            this._dialogRef.close(cycle);
-            this._snackBar.open('Se ha creado correctamente', 'Cerrar', {
-              duration: 1000,
-              horizontalPosition: 'center',
-              verticalPosition: 'bottom',
-            });
-          },
-          error: (err) => {
-            console.error('CREATE SCHEDULE ERROR: ', err);
-          },
-          complete: () => {
-            this.loading.set(false);
-          },
+        const created = await firstValueFrom(
+          this._createOneSchedule.mutate({
+            variables: {
+              schedule: {
+                ...this._buildPayload(values),
+                periodId: this._globalStateService.period!.id,
+                branchId: this._globalStateService.branch!.id,
+              },
+            },
+          })
+        );
+
+        this._dialogRef.close(created.data?.createOneSchedule);
+        this._snackBar.open('Se ha creado correctamente', 'Cerrar', {
+          duration: 1000,
+          horizontalPosition: 'center',
+          verticalPosition: 'bottom',
         });
       }
+    } catch (err) {
+      console.error(
+        this.isEditing() ? 'UPDATE SCHEDULE ERROR: ' : 'CREATE SCHEDULE ERROR: ',
+        err
+      );
+    } finally {
+      this.loading.set(false);
     }
   }
 
-  public remove() {
-    if (!!this.data?.id) {
-      this.removeLoading.set(true);
-
-      this._deleteOneSchedule
-        .mutate({
-          variables: { id: this.data!.id },
-        })
-        .subscribe({
-          next: () => {
-            this._snackBar.open('Se ha eliminado correctamente', 'Cerrar', {
-              duration: 1000,
-              horizontalPosition: 'center',
-              verticalPosition: 'bottom',
-            });
-            this._dialogRef.close(true);
-          },
-          error: (err) => {
-            console.error('DELETE SCHEDULE ERROR: ', err);
-          },
-          complete: () => {
-            this.removeLoading.set(false);
-          },
-        });
+  public remove(): void {
+    if (!this.data?.id) {
+      return;
     }
+
+    this.removeLoading.set(true);
+
+    this._deleteOneSchedule
+      .mutate({
+        variables: { id: this.data.id },
+      })
+      .subscribe({
+        next: () => {
+          this._snackBar.open('Se ha eliminado correctamente', 'Cerrar', {
+            duration: 1000,
+            horizontalPosition: 'center',
+            verticalPosition: 'bottom',
+          });
+          this._dialogRef.close(true);
+        },
+        error: (err) => {
+          console.error('DELETE SCHEDULE ERROR: ', err);
+        },
+        complete: () => {
+          this.removeLoading.set(false);
+        },
+      });
   }
 
-  private _update(values: FormValues) {
-    return this._updateOneSchedule
-      .mutate({
-        variables: {
-          id: this.data!.id,
-          update: {
-            day: parseInt(values.day, 10),
-            start: values.start.toTimeString().slice(0, 5),
-            end: values.end.toTimeString().slice(0, 5),
-            levels: values.levels!.map((id) => ({ id })),
-            disciplineId: values.discipline!.id,
-            teacherId: values.teacher!.id,
-          },
-        },
-      })
-      .pipe(map((value) => value.data?.updateOneSchedule));
-  }
-
-  private _save(values: FormValues) {
-    return this._createOneSchedule
-      .mutate({
-        variables: {
-          schedule: {
-            day: parseInt(values.day, 10),
-            start: values.start.toTimeString().slice(0, 5),
-            end: values.end.toTimeString().slice(0, 5),
-            disciplineId: values.discipline!.id,
-            teacherId: values.teacher!.id,
-            periodId: this._globalStateService.period!.id,
-            branchId: this._globalStateService.branch!.id,
-            levels: values.levels!.map((id) => ({ id })),
-          },
-        },
-      })
-      .pipe(map((value) => value.data?.createOneSchedule));
+  private _buildPayload(values: ScheduleFormFields) {
+    return {
+      day: parseInt(values.day, 10),
+      start: values.start,
+      end: values.end,
+      levels: values.levels.map((id) => ({ id })),
+      disciplineId: values.discipline!.id,
+      teacherId: values.teacher!.id,
+    };
   }
 }
-
-type FormValues = {
-  day: string;
-  start: Date;
-  end: Date;
-  discipline: DisciplinePartsFragment | null;
-  teacher: TeacherPartsFragment | null;
-  levels: string[];
-};

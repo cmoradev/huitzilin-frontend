@@ -1,27 +1,30 @@
 <h2 mat-dialog-title>Creación de adeudo para paquete a la medida</h2>
 <mat-dialog-content>
-  <form id="dataForm" [formGroup]="formGroup" (ngSubmit)="submit()">
-    <mat-form-field class="w-full">
-      <mat-label>Horas</mat-label>
-      <input matInput type="number" [formControl]="hoursControl" />
-      <mat-hint> Número de horas que se van a cobrar. </mat-hint>
-    </mat-form-field>
+  <mat-form-field class="w-full">
+    <mat-label>Horas</mat-label>
+    <input
+      matInput
+      type="number"
+      [value]="hours()"
+      (input)="onHoursChange(+$any($event.target).value)"
+    />
+    <mat-hint> Número de horas que se van a cobrar. </mat-hint>
+  </mat-form-field>
 
-    <mat-accordion multi formArrayName="debits">
-      @for (debitFormGroup of debits.controls; track $index +
-      debitFormGroup.get('amount')?.value+
-      debitFormGroup.get('description')?.value) {
-      <app-debit-with-discount-form
-        [formGroup]="debitFormGroup"
-        (remove)="removeDebit($index)"
-      />
-      }
-    </mat-accordion>
-  </form>
+  <mat-accordion multi>
+    @for (debit of debits(); track $index + debit.description) {
+    <app-debit-with-discount-form
+      [debit]="debit"
+      [index]="$index"
+      (remove)="removeDebit($index)"
+      (update)="updateDebit($index, $event)"
+    />
+    }
+  </mat-accordion>
 </mat-dialog-content>
 <mat-dialog-actions align="end">
   <button mat-button mat-dialog-close [disabled]="loading()">Cancelar</button>
-  <button mat-button cdkFocusInitial form="dataForm" [disabled]="loading()">
+  <button mat-button cdkFocusInitial (click)="submit()" [disabled]="loading()">
     {{ loading() ? "Guardando..." : "Guardar" }}
   </button>
 </mat-dialog-actions>

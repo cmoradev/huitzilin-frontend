@@ -1,27 +1,29 @@
 <h2 mat-dialog-title>
-  {{ !!data?.id ? "Actualizar" : "Crear" }} paquete
+  {{ isEditing() ? "Actualizar" : "Crear" }} paquete
 </h2>
 <mat-dialog-content>
-  <form id="dataForm" [formGroup]="formGroup" (ngSubmit)="submit()">
+  <form id="dataForm" [formRoot]="activityForm" (submit)="submit()">
     <div class="flex flex-col gap-3">
       <mat-form-field>
         <mat-label>Nombre del paquete</mat-label>
         <input
           matInput
           placeholder="Ej. Yoga, Crossfit"
-          formControlName="name"
+          [formField]="activityForm.name"
         />
         <mat-hint>Ingrese el nombre del paquete</mat-hint>
-        <mat-error>
-          {{ formTools.checkForErrorsIn(formGroup.get("name")) }}
-        </mat-error>
+        @if (activityForm.name().touched() && activityForm.name().invalid()) {
+          <mat-error>
+            {{ activityForm.name().errors()[0].message }}
+          </mat-error>
+        }
       </mat-form-field>
     </div>
   </form>
 </mat-dialog-content>
 <mat-dialog-actions align="end">
-  <button mat-button mat-dialog-close [disabled]="loading()">Cancelar</button>
-  <button mat-button cdkFocusInitial form="dataForm" [disabled]="loading()">
-    {{ loading() ? "Guardando..." : "Guardar" }}
+  <button mat-button mat-dialog-close [disabled]="submitting()">Cancelar</button>
+  <button mat-button cdkFocusInitial form="dataForm" [disabled]="submitting()">
+    {{ submitting() ? "Guardando..." : "Guardar" }}
   </button>
 </mat-dialog-actions>

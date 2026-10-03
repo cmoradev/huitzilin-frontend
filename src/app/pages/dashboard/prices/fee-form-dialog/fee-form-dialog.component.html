@@ -1,10 +1,10 @@
-<h2 mat-dialog-title>{{ !!data?.id ? "Actualizar" : "Crear" }} tarifa</h2>
+<h2 mat-dialog-title>{{ isEditing() ? "Actualizar" : "Crear" }} tarifa</h2>
 <mat-dialog-content>
-  <form id="dataForm" [formGroup]="formGroup" (ngSubmit)="submit()">
+  <form id="dataForm" [formRoot]="feeForm" (submit)="submit()">
     <div class="flex flex-col gap-3">
       <mat-form-field>
         <mat-label>Frecuencia de pago</mat-label>
-        <mat-select formControlName="frequency">
+        <mat-select [formField]="feeForm.frequency">
           @for (frequency of frequencies; track $index) {
           <mat-option [value]="frequency.value">{{
             frequency.label
@@ -14,47 +14,54 @@
         <mat-hint
           >Seleccione la frecuencia con la que se realizará el pago</mat-hint
         >
-        <mat-error>
-          {{ formTools.checkForErrorsIn(formGroup.get("frequency")) }}
-        </mat-error>
+        @if (feeForm.frequency().touched() && feeForm.frequency().invalid()) {
+          <mat-error>
+            {{ feeForm.frequency().errors()[0].message }}
+          </mat-error>
+        }
       </mat-form-field>
       <mat-form-field>
         <mat-label>Nombre de la tarifa</mat-label>
         <input
           matInput
           placeholder="Ej: Taekwondo - Mensualidad"
-          formControlName="name"
+          [formField]="feeForm.name"
+          (input)="onNameInput($any($event.target).value)"
         />
         <mat-hint>Ingrese un nombre que describa claramente la tarifa</mat-hint>
-        <mat-error>
-          {{ formTools.checkForErrorsIn(formGroup.get("name")) }}
-        </mat-error>
+        @if (feeForm.name().touched() && feeForm.name().invalid()) {
+          <mat-error>
+            {{ feeForm.name().errors()[0].message }}
+          </mat-error>
+        }
       </mat-form-field>
       <mat-form-field>
         <mat-label>Precio base</mat-label>
         <input
           matInput
           placeholder="Ej: 4500"
-          formControlName="amount"
+          [formField]="feeForm.amount"
           type="number"
         />
         <span matTextPrefix>$&nbsp;</span>
         <span matTextSuffix>.00</span>
         <mat-hint> Ingrese el precio base de la tarifa sin IVA. </mat-hint>
-        <mat-error>
-          {{ formTools.checkForErrorsIn(formGroup.get("amount")) }}
-        </mat-error>
+        @if (feeForm.amount().touched() && feeForm.amount().invalid()) {
+          <mat-error>
+            {{ feeForm.amount().errors()[0].message }}
+          </mat-error>
+        }
       </mat-form-field>
 
-      <mat-checkbox formControlName="autoLoad">
+      <mat-checkbox [formField]="feeForm.autoLoad">
         ¿Cargar automáticamente esta tarifa al crear una inscripción?
       </mat-checkbox>
     </div>
   </form>
 </mat-dialog-content>
 <mat-dialog-actions align="end">
-  <button mat-button mat-dialog-close [disabled]="loading()">Cancelar</button>
-  <button mat-button cdkFocusInitial form="dataForm" [disabled]="loading()">
-    {{ loading() ? "Guardando..." : "Guardar" }}
+  <button mat-button mat-dialog-close [disabled]="submitting()">Cancelar</button>
+  <button mat-button cdkFocusInitial form="dataForm" [disabled]="submitting()">
+    {{ submitting() ? "Guardando..." : "Guardar" }}
   </button>
 </mat-dialog-actions>

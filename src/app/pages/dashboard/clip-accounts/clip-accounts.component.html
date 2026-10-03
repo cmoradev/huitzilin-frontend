@@ -9,7 +9,8 @@
         <mat-icon svgIcon="magnify" matPrefix />
         <input
           type="search"
-          [formControl]="searchControl"
+          [value]="searchTerm()"
+          (input)="onSearchInput($event)"
           matInput
           placeholder="Ej: administrador@gmail.com"
         />
@@ -19,7 +20,7 @@
         mat-icon-button
         matTooltip="Refrescar"
         (click)="refresh()"
-        [ngClass]="{ 'animate-spin': loading() }"
+        [class.animate-spin]="loading()"
       >
         <mat-icon svgIcon="refresh" />
       </button>

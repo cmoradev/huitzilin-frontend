@@ -2,14 +2,14 @@
 
 <mat-dialog-content>
   <form
-    [formGroup]="formGroup"
+    [formRoot]="actionForm"
     class="flex flex-col gap-3"
     id="permissionForm"
-    (ngSubmit)="saveData()"
+    (submit)="saveData()"
   >
     <mat-form-field>
       <mat-label>Ruta</mat-label>
-      <mat-select formControlName="route">
+      <mat-select [formField]="actionForm.route">
         @for (group of navigations; track group.section) {
         <mat-optgroup [label]="group.section">
           @for (link of group.routes; track link.route + $index) {
@@ -29,26 +29,36 @@
       <mat-hint>
         Seleccione la ruta a la que se le asignarán los permisos
       </mat-hint>
-      <mat-error>
-        {{ formTools.checkForErrorsIn(formGroup.get("route")) }}
-      </mat-error>
+      @if (actionForm.route().touched() && actionForm.route().invalid()) {
+        <mat-error>
+          {{ actionForm.route().errors()[0].message }}
+        </mat-error>
+      }
     </mat-form-field>
 
-    @if (withRoute) {
-    <div formArrayName="actions">
+    @if (currentRoute()) {
+    <div>
       <h5 class="font-medium">Acciones permitidas</h5>
 
-      @for (permission of permissions; track permission.permission) {
-      <mat-checkbox [formControlName]="permission.permission" [value]="permission.permission">
+      @for (permission of permissions(); track permission.permission) {
+      <mat-checkbox
+        [checked]="actionModel().actions.includes(permission.permission)"
+        (change)="togglePermission(permission.permission, $event.checked)"
+      >
         {{ permission.name }}
       </mat-checkbox>
       }
+      @if (actionForm.actions().touched() && actionForm.actions().invalid()) {
+        <mat-error>
+          {{ actionForm.actions().errors()[0].message }}
+        </mat-error>
+      }
     </div>
 
-    @if (!isGlobalRoute) {
+    @if (!isGlobalRoute()) {
     <mat-form-field>
       <mat-label>Sucursales</mat-label>
-      <mat-select formControlName="resources" multiple>
+      <mat-select [formField]="actionForm.resources" multiple>
         @for (branch of branchTools.options(); track $index) {
         <mat-option [value]="branch.id">
           <div class="flex items-center gap-2">
@@ -61,14 +71,16 @@
       <mat-hint>
         Seleccione la ruta a la que se le asignarán los permisos
       </mat-hint>
-      <mat-error>
-        {{ formTools.checkForErrorsIn(formGroup.get("route")) }}
-      </mat-error>
+      @if (actionForm.resources().touched() && actionForm.resources().invalid()) {
+        <mat-error>
+          {{ actionForm.resources().errors()[0].message }}
+        </mat-error>
+      }
     </mat-form-field>
     } }
 
     <button mat-button form="permissionForm">
-      {{ formGroup.get("id")?.value ? "Actualizar" : "Crear" }} permiso
+      {{ actionModel().id ? "Actualizar" : "Crear" }} permiso
     </button>
   </form>
 </mat-dialog-content>

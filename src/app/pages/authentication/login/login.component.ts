@@ -1,14 +1,28 @@
-import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  inject,
+  signal,
+} from '@angular/core';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { Router, RouterLink } from '@angular/router';
-import { AuthService, FormToolsService } from '@services';
-import { ReactiveFormsModule, Validators } from '@angular/forms';
+import { AuthService } from '@services';
+import {
+  form,
+  FormField,
+  FormRoot,
+  required,
+  submit,
+  ValidationError,
+} from '@angular/forms/signals';
 import { MatIconModule } from '@angular/material/icon';
 import { CombinedGraphQLErrors } from '@apollo/client/core';
+import { firstValueFrom } from 'rxjs';
+import { LoginFormFields } from '@app/types/authentication';
 
 interface ErrorExtensions {
   readonly statusCode?: number;
@@ -30,7 +44,8 @@ function readStatusCode(err: unknown): number | undefined {
   selector: 'app-login',
   imports: [
     RouterLink,
-    ReactiveFormsModule,
+    FormField,
+    FormRoot,
     MatFormFieldModule,
     MatCheckboxModule,
     MatButtonModule,
@@ -47,56 +62,64 @@ export class LoginComponent {
 
   private readonly _authService = inject(AuthService);
 
-  public readonly formTools = inject(FormToolsService);
-
-  public loading = signal(false);
   public showPassword = signal(false);
 
-  public formGroup = this.formTools.builder.group({
-    password: ['', [Validators.required]],
-    username: [this._authService.username, [Validators.required]],
-    rememberMe: [false],
+  public readonly loginModel = signal<LoginFormFields>({
+    username: this._authService.username,
+    password: '',
+    rememberMe: false,
   });
 
-  public togglePasswordVisibility() {
+  public readonly loginForm = form(this.loginModel, (schema) => {
+    required(schema.username, { message: 'Campo requerido' });
+    required(schema.password, { message: 'Campo requerido' });
+  });
+
+  public togglePasswordVisibility(): void {
     this.showPassword.update((current) => !current);
   }
 
-  public submit() {
-    this.loading.set(true);
+  public async submit(): Promise<void> {
+    const { username, password, rememberMe } = this.loginModel();
 
-    if (this.formGroup.valid) {
-      const values = this.formGroup.getRawValue() as any;
-
-      const { username, password, rememberMe } = values;
-
-      if (rememberMe) {
-        this._authService.username = username;
-      }
-
-      this._authService.signIn({ username, password }).subscribe({
-        next: () => {
-          this.loading.set(false);
-          this.router.navigate(['/']);
-        },
-        error: (err) => {
-          const statusCode = readStatusCode(err);
-
-          if (statusCode === 401) {
-            this.formGroup.get('password')?.setErrors({
-              unauthenticated: true,
-            });
-          }
-
-          if (statusCode === 409) {
-            this.formGroup.get('username')?.setErrors({
-              userNotFound: true,
-            });
-          }
-
-          this.loading.set(false);
-        },
-      });
+    if (rememberMe) {
+      this._authService.username = username;
     }
+
+    await submit(this.loginForm, async () => {
+      try {
+        await firstValueFrom(
+          this._authService.signIn({ username, password })
+        );
+        this.router.navigate(['/']);
+        return;
+      } catch (err) {
+        const statusCode = readStatusCode(err);
+
+        if (statusCode === 401) {
+          this.loginModel.update((current) => ({ ...current, password: '' }));
+          const error: ValidationError.WithFieldTree = {
+            kind: 'unauthenticated',
+            message: 'Credenciales no validas',
+            fieldTree: this.loginForm.password,
+          };
+          throw error;
+        }
+
+        if (statusCode === 409) {
+          const error: ValidationError.WithFieldTree = {
+            kind: 'userNotFound',
+            message: 'Usuario no encontrado',
+            fieldTree: this.loginForm.username,
+          };
+          throw error;
+        }
+
+        throw {
+          kind: 'serverError',
+          message: 'No fue posible iniciar sesión',
+        };
+      }
+    });
   }
 }

@@ -11,7 +11,8 @@
             <input
               matInput
               placeholder="Ej. Enero 2025"
-              [formControl]="searchControl"
+              [value]="searchTerm()"
+              (input)="searchTerm.set($any($event.target).value)"
             />
           </mat-form-field>
           <button

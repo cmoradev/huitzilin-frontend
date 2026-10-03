@@ -2,19 +2,21 @@
 <mat-dialog-content>
   <form
     id="dataForm"
-    [formGroup]="formGroup"
-    (ngSubmit)="submit()"
+    [formRoot]="policyForm"
+    (submit)="submit()"
     class="flex flex-col gap-3"
   >
     <h5 class="font-medium">Informacion de la política</h5>
 
     <mat-form-field>
       <mat-label>Nombre de la política</mat-label>
-      <input matInput placeholder="Ej: Administrador" formControlName="name" />
+      <input matInput placeholder="Ej: Administrador" [formField]="policyForm.name" />
       <mat-hint>Ingrese el nombre de la política</mat-hint>
-      <mat-error>
-        {{ formTools.checkForErrorsIn(formGroup.get("name")) }}
-      </mat-error>
+      @if (policyForm.name().touched() && policyForm.name().invalid()) {
+        <mat-error>
+          {{ policyForm.name().errors()[0].message }}
+        </mat-error>
+      }
     </mat-form-field>
     <div class="flex justify-between items-center mb-2">
       <h5 class="font-medium">Lista de permisos</h5>

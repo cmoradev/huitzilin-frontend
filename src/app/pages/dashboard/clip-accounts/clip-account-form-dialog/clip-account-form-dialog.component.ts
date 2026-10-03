@@ -1,5 +1,12 @@
-import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
-import { ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  linkedSignal,
+  signal,
+} from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import {
   MAT_DIALOG_DATA,
@@ -15,8 +22,15 @@ import {
   UpdateClipAccount,
   UpdateOneClipAccountGQL,
 } from '@graphql';
-import { FormToolsService } from '@services';
-import { map } from 'rxjs';
+import {
+  form,
+  FormField,
+  FormRoot,
+  maxLength,
+  required,
+} from '@angular/forms/signals';
+import { firstValueFrom } from 'rxjs';
+import { ClipAccountFormFields } from '@app/types/codes';
 
 @Component({
   selector: 'app-clip-account-form-dialog',
@@ -24,18 +38,16 @@ import { map } from 'rxjs';
     MatFormFieldModule,
     MatInputModule,
     MatDialogModule,
-    ReactiveFormsModule,
+    FormField,
     MatButtonModule,
+    FormRoot,
   ],
   templateUrl: './clip-account-form-dialog.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
 export class ClipAccountFormDialogComponent {
-  public readonly formTools = inject(FormToolsService);
-
-  public loading = signal<boolean>(false);
-  public data: ClipAccountPartsFragment | null = inject(MAT_DIALOG_DATA);
+  public readonly data: ClipAccountPartsFragment | null = inject(MAT_DIALOG_DATA);
 
   private readonly _createOneClipAccount = inject(CreateOneClipAccountGQL);
   private readonly _updateOneClipAccount = inject(UpdateOneClipAccountGQL);
@@ -44,113 +56,92 @@ export class ClipAccountFormDialogComponent {
     MatDialogRef<ClipAccountFormDialogComponent>
   );
 
-  public formGroup = this.formTools.builder.group({
-    name: this.formTools.builder.control<string>('', {
-      validators: [Validators.required, Validators.maxLength(64)],
-      nonNullable: true,
-    }),
-    token: this.formTools.builder.control<string>('', {
-      validators: [Validators.required],
-      nonNullable: true,
-    }),
-    webhook: this.formTools.builder.control<string>('', {
-      validators: [Validators.required],
-      nonNullable: true,
-    }),
-    default: this.formTools.builder.control<string>('', {
-      validators: [Validators.required],
-      nonNullable: true,
-    }),
-    success: this.formTools.builder.control<string>('', {
-      validators: [Validators.required],
-      nonNullable: true,
-    }),
-    error: this.formTools.builder.control<string>('', {
-      validators: [Validators.required],
-      nonNullable: true,
-    }),
+  public readonly isEditing = computed(() => !!this.data?.id);
+
+  private readonly _initialModel = computed<ClipAccountFormFields>(() => ({
+    name: this.data?.name ?? '',
+    token: '',
+    webhook: this.data?.webhook ?? '',
+    default: this.data?.default ?? '',
+    success: this.data?.success ?? '',
+    error: this.data?.error ?? '',
+  }));
+
+  public readonly accountModel = linkedSignal<ClipAccountFormFields, ClipAccountFormFields>({
+    source: this._initialModel,
+    computation: (initial) => ({ ...initial }),
   });
 
-  ngOnInit(): void {
-    if (!!this.data?.id) {
-      this.formGroup.patchValue({
-        name: this.data.name,
-        webhook: this.data.webhook,
-        success: this.data.success,
-        default: this.data.default,
-        error: this.data.error,
-      });
+  public readonly accountForm = form(this.accountModel, (schema) => {
+    required(schema.name, { message: 'Campo requerido' });
+    maxLength(schema.name, 64, { message: 'Máximo 64 caracteres' });
+    required(schema.webhook, { message: 'Campo requerido' });
+    required(schema.default, { message: 'Campo requerido' });
+    required(schema.success, { message: 'Campo requerido' });
+    required(schema.error, { message: 'Campo requerido' });
+  });
 
-      this.formGroup.get('token')?.clearValidators();
-      this.formGroup.get('token')?.updateValueAndValidity();
-    }
+  public readonly submitting = signal(false);
+
+  constructor() {
+    effect(() => {
+      this._dialogRef.disableClose = this.submitting();
+    });
   }
 
   public async submit(): Promise<void> {
-    if (this.formGroup.valid) {
-      this.loading.set(true);
+    const values = this.accountModel();
+    const editing = this.isEditing();
 
-      const values = this.formGroup.getRawValue();
+    if (this.accountForm().invalid()) {
+      this.accountForm().markAsTouched();
+      return;
+    }
 
-      if (!!this.data?.id) {
-        const payload: UpdateClipAccount = {
-          name: values.name,
-          
-        };
+    // Al editar, el token es opcional. Marcamos el campo como tocado para
+    // que el template muestre el mensaje en caso de ser requerido.
+    if (!editing && !values.token) {
+      this.accountForm.token().markAsTouched();
+      return;
+    }
 
+    this.submitting.set(true);
+
+    try {
+      if (editing) {
+        const payload: UpdateClipAccount = { name: values.name };
         if (values.token !== '') {
           payload.token = values.token;
         }
 
-        this._update(payload).subscribe({
-          next: (cycle) => {
-            this._dialogRef.close(cycle);
-          },
-          error: (err) => {
-            console.error('UPDATE CYCLE ERROR: ', err);
-          },
-          complete: () => {
-            this.loading.set(false);
-          },
-        });
+        const updated = await firstValueFrom(
+          this._updateOneClipAccount.mutate({
+            variables: {
+              id: this.data!.id,
+              update: payload,
+            },
+          })
+        );
+
+        this._dialogRef.close(updated.data?.updateOneClipAccount);
       } else {
-        this._save(values).subscribe({
-          next: (cycle) => {
-            this._dialogRef.close(cycle);
-          },
-          error: (err) => {
-            console.error('CREATE CYCLE ERROR: ', err);
-          },
-          complete: () => {
-            this.loading.set(false);
-          },
-        });
+        const created = await firstValueFrom(
+          this._createOneClipAccount.mutate({
+            variables: {
+              account: { ...values } as CreateClipAccount,
+            },
+          })
+        );
+
+        this._dialogRef.close(created.data?.createOneClipAccount);
       }
+    } catch (err) {
+      console.error(
+        editing ? 'UPDATE CYCLE ERROR: ' : 'CREATE CYCLE ERROR: ',
+        err
+      );
+    } finally {
+      this.submitting.set(false);
     }
-  }
-
-  private _update(values: UpdateClipAccount) {
-    return this._updateOneClipAccount
-      .mutate({
-        variables: {
-          id: this.data!.id,
-          update: {
-            ...values,
-          },
-        },
-      })
-      .pipe(map((value) => value.data?.updateOneClipAccount));
-  }
-
-  private _save(values: CreateClipAccount) {
-    return this._createOneClipAccount
-      .mutate({
-        variables: {
-          account: {
-            ...values,
-          },
-        },
-      })
-      .pipe(map((value) => value.data?.createOneClipAccount));
   }
 }

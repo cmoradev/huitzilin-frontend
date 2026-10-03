@@ -1,5 +1,4 @@
 export * from './auth.service';
-export * from './form-tools.service';
 export * from './global-state.service';
 export * from './pos.service';
 export * from './storage.service';

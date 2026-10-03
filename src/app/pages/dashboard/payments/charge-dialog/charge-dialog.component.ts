@@ -1,4 +1,11 @@
-import { Component, inject, OnInit, signal, ChangeDetectionStrategy } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  signal,
+} from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatTabsModule } from '@angular/material/tabs';
 import {
@@ -7,21 +14,23 @@ import {
   MatDialogRef,
 } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
-import { FormToolsService } from '@services';
 import { CreatePayment, PaymentMethod } from '@graphql';
 
 import { CurrencyPipe } from '@angular/common';
 import { ChargeFormComponent } from '../charge-form/charge-form.component';
-import { debounceTime } from 'rxjs';
-import {
-  FormArray,
-  FormGroup,
-  ReactiveFormsModule,
-  Validators,
-} from '@angular/forms';
 import Decimal from 'decimal.js';
 import { MatError } from '@angular/material/form-field';
 import { paymentIcons, paymentNames } from '@utils/contains';
+import {
+  form,
+  FormRoot,
+  validateTree,
+} from '@angular/forms/signals';
+import { PaymentFormFields } from '@app/types/payments';
+
+interface ChargeFormFields {
+  payments: PaymentFormFields[];
+}
 
 @Component({
   selector: 'app-charge-dialog',
@@ -31,134 +40,126 @@ import { paymentIcons, paymentNames } from '@utils/contains';
     MatIconModule,
     MatButtonModule,
     CurrencyPipe,
-    ReactiveFormsModule,
     ChargeFormComponent,
     MatError,
+    FormRoot,
   ],
   templateUrl: './charge-dialog.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
-export class ChargeDialogComponent implements OnInit {
+export class ChargeDialogComponent {
   private readonly _dialogRef = inject(MatDialogRef<ChargeDialogComponent>);
 
-  public formTools = inject(FormToolsService);
-  public total = inject<number>(MAT_DIALOG_DATA);
-  public loading = signal<boolean>(false);
-  public remainingAmount = signal<number>(0);
+  public readonly total = inject<number>(MAT_DIALOG_DATA);
+  public readonly loading = signal<boolean>(false);
 
-  public paymentNames: any = paymentNames;
+  public readonly paymentNames: any = paymentNames;
+  public readonly paymentIcons: any = paymentIcons;
 
-  public paymentIcons: any = paymentIcons;
+  public readonly paymentsModel = signal<ChargeFormFields>({
+    payments: [
+      this._createEmptyPayment(PaymentMethod.Transfer),
+      this._createEmptyPayment(PaymentMethod.Card),
+      this._createEmptyPayment(PaymentMethod.Cash),
+    ],
+  });
 
-  public paymentsForm = this.formTools.builder.group(
-    {
-      payments: this.formTools.builder.array([
-        this.createPaymentForm(PaymentMethod.Transfer),
-        this.createPaymentForm(PaymentMethod.Card),
-        this.createPaymentForm(PaymentMethod.Cash),
-      ]),
-    }
+  public readonly chargeForm = form(this.paymentsModel, (schema) => {
+    validateTree(schema, ({ valueOf }) => {
+      const payments = valueOf(schema.payments);
+
+      if (!payments || payments.length === 0) {
+        return null;
+      }
+
+      const totalReceived = payments.reduce(
+        (acc, current) => acc.add(current.amount ?? 0),
+        new Decimal(0)
+      );
+
+      const totalDecimal = new Decimal(this.total);
+      const remaining = totalDecimal.sub(totalReceived);
+
+      if (!remaining.greaterThan(-0.01)) {
+        return {
+          kind: 'totalExceeded',
+          message: 'El total recibido excede la deuda total',
+        };
+      }
+
+      return null;
+    });
+  });
+
+  public readonly remainingAmount = computed(() => {
+    const payments = this.paymentsModel().payments;
+
+    const totalReceived = payments.reduce(
+      (acc, current) => acc.add(current.amount ?? 0),
+      new Decimal(0)
+    );
+
+    return new Decimal(this.total).sub(totalReceived).toNumber();
+  });
+
+  public readonly receivedPayments = computed(() =>
+    this.paymentsModel().payments.filter((payment) => !!payment.amount)
   );
 
-  public get payments(): FormArray<FormGroup> {
-    return this.paymentsForm.get('payments') as FormArray<FormGroup>;
-  }
+  constructor() {
+    effect(() => {
+      this._dialogRef.disableClose = this.loading();
+    });
 
-  ngOnInit(): void {
-    this.paymentsForm.valueChanges.subscribe({
-      next: () => {
-        const payments = this.filterPaymentRecived();
-
-        const recived = payments.reduce((acc, current) => {
-          return acc.add(current.amount);
-        }, new Decimal(0));
-
-        const totalDecimal = new Decimal(this.total);
-        const remainingAmount = totalDecimal.sub(recived);
-
-        if (!remainingAmount.greaterThan(-0.01)) {
-          this.paymentsForm.setErrors({ totalExceeded: true });
-        }
-
-        this.remainingAmount.set(remainingAmount.toNumber());
-      },
+    effect(() => {
+      // Recalcula la validación cruzada cuando cambian los montos.
+      const _ = this.paymentsModel().payments.map((p) => p.amount);
+      this.chargeForm();
     });
   }
 
-  public submit() {
-    this.paymentsForm.markAllAsTouched();
+  public updatePayment(index: number, updated: PaymentFormFields): void {
+    this.paymentsModel.update((current) => ({
+      payments: current.payments.map((payment, idx) =>
+        idx === index ? updated : payment
+      ),
+    }));
+  }
 
-    if (this.paymentsForm.valid) {
-      const recived = this.filterPaymentRecived();
+  public submit(): void {
+    this.chargeForm().markAsTouched();
 
-      if (!!recived.length) {
-        this.loading.set(true);
-
-        const payments: CreatePayment[] = recived.map((payment) => ({
-          method: payment.method,
-          amount: payment.amount,
-          date: payment.date,
-          transaction: payment.transaction,
-          bank: payment.bank,
-        }));
-
-        this._dialogRef.close(payments);
-      }
+    if (this.chargeForm().invalid()) {
+      return;
     }
+
+    const received = this.receivedPayments();
+
+    if (received.length === 0) {
+      return;
+    }
+
+    this.loading.set(true);
+
+    const payments: CreatePayment[] = received.map((payment) => ({
+      method: payment.method,
+      amount: payment.amount,
+      date: payment.date,
+      transaction: payment.transaction,
+      bank: payment.bank,
+    }));
+
+    this._dialogRef.close(payments);
   }
 
-  private createPaymentForm(method: PaymentMethod): FormGroup {
-    const form = this.formTools.builder.group({
-      method: this.formTools.builder.control<PaymentMethod>(method, {
-        validators: [Validators.required],
-        nonNullable: true,
-      }),
-      amount: this.formTools.builder.control<number>(0, {
-        nonNullable: true,
-      }),
-      date: this.formTools.builder.control<Date>(new Date(), {
-        nonNullable: true,
-      }),
-      transaction: this.formTools.builder.control<string>('', {
-        nonNullable: true,
-      }),
-      bank: this.formTools.builder.control<string>('', {
-        nonNullable: true,
-      }),
-    });
-
-    form
-      .get('amount')
-      ?.valueChanges.pipe(debounceTime(300))
-      .subscribe({
-        next: (value) => {
-          if (!!value) {
-            form.get('amount')?.setValidators([Validators.required]);
-            form.get('date')?.setValidators([Validators.required]);
-
-            if (form.get('method')?.value !== PaymentMethod.Cash) {
-              form.get('transaction')?.setValidators([Validators.required]);
-              form.get('bank')?.setValidators([Validators.required]);
-            }
-          } else {
-            form.get('amount')?.clearValidators();
-            form.get('date')?.clearValidators();
-            form.get('transaction')?.clearValidators();
-            form.get('bank')?.clearValidators();
-          }
-
-          form.get('amount')?.updateValueAndValidity();
-          form.get('date')?.updateValueAndValidity();
-          form.get('transaction')?.updateValueAndValidity();
-          form.get('bank')?.updateValueAndValidity();
-        },
-      });
-
-    return form;
-  }
-
-  private filterPaymentRecived() {
-    return this.payments.value.filter((payment) => !!payment.amount);
+  private _createEmptyPayment(method: PaymentMethod): PaymentFormFields {
+    return {
+      method,
+      amount: 0,
+      date: new Date().toISOString(),
+      transaction: '',
+      bank: '',
+    };
   }
 }

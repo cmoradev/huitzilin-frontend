@@ -1,14 +1,20 @@
 <h2 mat-dialog-title>{{ !!data?.id ? "Actualizar" : "Crear" }} disciplina</h2>
 <mat-dialog-content>
-  <form id="dataForm" [formGroup]="formGroup" (ngSubmit)="submit()">
+  <form id="dataForm" [formRoot]="disciplineForm" (submit)="submit()">
     <div class="flex flex-col gap-3">
       <mat-form-field>
         <mat-label>Nombre</mat-label>
-        <input matInput placeholder="Ej: Taekwondo" formControlName="name" />
+        <input
+          matInput
+          placeholder="Ej: Taekwondo"
+          [formField]="disciplineForm.name"
+        />
         <mat-hint>Ingrese el nombre de la disciplina</mat-hint>
-        <mat-error>
-          {{ formTools.checkForErrorsIn(formGroup.get("name")) }}
-        </mat-error>
+        @if (disciplineForm.name().touched() && disciplineForm.name().invalid()) {
+          <mat-error>
+            {{ disciplineForm.name().errors()[0].message }}
+          </mat-error>
+        }
       </mat-form-field>
 
       <mat-form-field>
@@ -17,30 +23,34 @@
           type="number"
           matInput
           placeholder="Ej: Taekwondo"
-          formControlName="minHours"
+          [formField]="disciplineForm.minHours"
         />
-        <mat-hint>Ingrese el nombre de la disciplina</mat-hint>
-        <mat-error>
-          {{ formTools.checkForErrorsIn(formGroup.get("minHours")) }}
-        </mat-error>
+        <mat-hint>Ingrese el número mínimo de horas</mat-hint>
+        @if (disciplineForm.minHours().touched() && disciplineForm.minHours().invalid()) {
+          <mat-error>
+            {{ disciplineForm.minHours().errors()[0].message }}
+          </mat-error>
+        }
       </mat-form-field>
 
       <mat-form-field>
         <mat-label>Paquete</mat-label>
-        <mat-select formControlName="packages" multiple>
-          @for (level of packages(); track $index) {
-          <mat-option [value]="level.id">
-            <h4 mat-line>{{ level.name }}</h4>
+        <mat-select [formField]="disciplineForm.packages" multiple>
+          @for (pkg of packages(); track $index) {
+          <mat-option [value]="pkg.id">
+            <h4 mat-line>{{ pkg.name }}</h4>
             <p mat-line class="text-sm text-gray-500">
-              {{ level.kind| packageKind }}
+              {{ pkg.kind | packageKind }}
             </p>
           </mat-option>
           }
         </mat-select>
-        <mat-hint> Seleccione ; </mat-hint>
-        <mat-error>
-          {{ formTools.checkForErrorsIn(formGroup.get("packages")) }}
-        </mat-error>
+        <mat-hint>Seleccione los paquetes asociados</mat-hint>
+        @if (disciplineForm.packages().touched() && disciplineForm.packages().invalid()) {
+          <mat-error>
+            {{ disciplineForm.packages().errors()[0].message }}
+          </mat-error>
+        }
       </mat-form-field>
     </div>
   </form>

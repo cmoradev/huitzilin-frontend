@@ -4,7 +4,6 @@ import {
   moveItemInArray,
 } from '@angular/cdk/drag-drop';
 import { Component, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
-import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatDialog } from '@angular/material/dialog';
@@ -26,7 +25,7 @@ import {
 } from '@graphql';
 import { GlobalStateService } from '@services';
 import { NgScrollbar } from 'ngx-scrollbar';
-import { debounceTime, map, merge, tap } from 'rxjs';
+import { debounceTime, map, tap } from 'rxjs';
 import { CalendarFormDialogComponent } from './calendar-form-dialog/calendar-form-dialog.component';
 import { CalendarDeleteDialogComponent } from './calendar-delete-dialog/calendar-delete-dialog.component';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
@@ -50,7 +49,6 @@ import { MatChipsModule } from '@angular/material/chips';
     MatIconModule,
     MatButtonModule,
     MatDividerModule,
-    ReactiveFormsModule,
     MatTooltipModule,
     DragDropModule,
     MatProgressBarModule,
@@ -82,16 +80,14 @@ export class CalendarPageComponent {
   public schedulesLoading = signal<boolean>(false);
   public schedulesTotalCount = signal<number>(0);
 
-  public searchControl = new FormControl('');
+  public readonly searchTerm = signal('');
 
   ngOnInit(): void {
-    merge(this._globalStateService.branch$, this.searchControl.valueChanges)
-      .pipe(debounceTime(300))
-      .subscribe({
-        next: () => {
-          this.refreshPeriods();
-        },
-      });
+    this._globalStateService.branch$.subscribe({
+      next: () => {
+        this.refreshPeriods();
+      },
+    });
 
     this._globalStateService.period$.subscribe({
       next: () => {
@@ -189,7 +185,7 @@ export class CalendarPageComponent {
         offset,
         filter: {
           branchId: { eq: this._globalStateService.branch!.id },
-          name: { iLike: `%${this.searchControl.value}%` },
+          name: { iLike: `%${this.searchTerm()}%` },
         },
       };
 

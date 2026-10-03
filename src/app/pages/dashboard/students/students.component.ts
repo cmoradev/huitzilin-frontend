@@ -1,14 +1,15 @@
-import { NgClass } from '@angular/common';
-import { AfterViewInit, Component, inject, signal, ViewChild, ChangeDetectionStrategy } from '@angular/core';
-import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  effect,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { MatIconButton } from '@angular/material/button';
-import {
-  MatCardModule,
-} from '@angular/material/card';
+import { MatCardModule } from '@angular/material/card';
 import { MatDialog } from '@angular/material/dialog';
-import {
-  MatFormFieldModule,
-} from '@angular/material/form-field';
+import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
@@ -19,7 +20,8 @@ import {
   StudentFilter,
   StudentPartsFragment,
 } from '@graphql';
-import { debounceTime, merge, startWith } from 'rxjs';
+import { toObservable } from '@angular/core/rxjs-interop';
+import { debounceTime } from 'rxjs';
 import { StudentDeleteDialogComponent } from './student-delete-dialog/student-delete-dialog.component';
 import { StudentFormDialogComponent } from './student-form-dialog/student-form-dialog.component';
 import { StudentDocumentsDialogComponent } from './student-documents-dialog/student-documents-dialog.component';
@@ -28,26 +30,23 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 @Component({
   selector: 'app-students',
   imports: [
-    NgClass,
     MatCardModule,
     MatFormFieldModule,
     MatInputModule,
-    MatFormFieldModule,
     MatIconButton,
     MatIconModule,
     MatTableModule,
     MatPaginatorModule,
     AvatarComponent,
-    ReactiveFormsModule,
     MatTooltipModule,
   ],
   templateUrl: './students.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
-export class StudentsComponent implements AfterViewInit {
-  @ViewChild('paginator') public paginator!: MatPaginator;
-  public searchControl = new FormControl('');
+export class StudentsComponent {
+  public readonly paginator = viewChild.required<MatPaginator>('paginator');
+  public readonly searchTerm = signal('');
 
   public displayedColumns: string[] = ['name', 'details', 'actions'];
   public dataSource = new MatTableDataSource<StudentPartsFragment>([]);
@@ -56,19 +55,50 @@ export class StudentsComponent implements AfterViewInit {
   public totalCount = signal(0);
 
   private readonly dialog = inject(MatDialog);
-  private readonly _companiesPageGQL = inject(GetStudentsPageGQL);
+  private readonly _studentsPageGQL = inject(GetStudentsPageGQL);
 
-  ngAfterViewInit(): void {
-    merge(
-      this.paginator.page,
-      this.searchControl.valueChanges,
-    )
-      .pipe(debounceTime(300), startWith({}))
-      .subscribe({
-        next: () => {
-          this.refresh();
-        },
-      });
+  private readonly _debouncedSearchTerm = signal('');
+
+  constructor() {
+    toObservable(this.searchTerm)
+      .pipe(debounceTime(300))
+      .subscribe((term) => this._debouncedSearchTerm.set(term));
+
+    effect(() => {
+      const paginator = this.paginator();
+      const filter = this._buildFilter(this._debouncedSearchTerm());
+
+      const limit = paginator.pageSize;
+      const offset = paginator.pageIndex * limit;
+
+      this._studentsPageGQL
+        .watch({
+          variables: { limit, offset, filter },
+          fetchPolicy: 'cache-and-network',
+          nextFetchPolicy: 'cache-and-network',
+          notifyOnNetworkStatusChange: true,
+        })
+        .valueChanges.subscribe({
+          next: ({ data, loading }) => {
+            const students = data?.students;
+            const nodes = (students?.nodes ?? []) as StudentPartsFragment[];
+            const totalCount = students?.totalCount ?? 0;
+
+            this.dataSource.data = nodes;
+
+            this.loading.set(loading);
+            this.totalCount.set(totalCount);
+          },
+        });
+    });
+  }
+
+  private _buildFilter(term: string): StudentFilter {
+    return { fullname: { iLike: `%${term}%` } };
+  }
+
+  public onSearchInput(event: Event): void {
+    this.searchTerm.set((event.target as HTMLInputElement).value);
   }
 
   public openDoucumentsDialog(value: StudentPartsFragment): void {
@@ -109,15 +139,14 @@ export class StudentsComponent implements AfterViewInit {
     });
   }
 
-  public refresh() {
-    const limit: number = this.paginator.pageSize;
-    const offset: number = this.paginator.pageIndex * limit;
+  public refresh(): void {
+    const paginator = this.paginator();
+    const filter = this._buildFilter(this.searchTerm());
 
-    const filter: StudentFilter = {
-      fullname: { iLike: `%${this.searchControl.value}%` },
-    };
+    const limit = paginator.pageSize;
+    const offset = paginator.pageIndex * limit;
 
-    this._companiesPageGQL
+    this._studentsPageGQL
       .watch({
         variables: { limit, offset, filter },
         fetchPolicy: 'cache-and-network',
@@ -130,11 +159,7 @@ export class StudentsComponent implements AfterViewInit {
           const nodes = (students?.nodes ?? []) as StudentPartsFragment[];
           const totalCount = students?.totalCount ?? 0;
 
-          this.dataSource.data = nodes.map((node) => {
-            return {
-              ...node,
-            };
-          });
+          this.dataSource.data = nodes;
 
           this.loading.set(loading);
           this.totalCount.set(totalCount);

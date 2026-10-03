@@ -1,5 +1,13 @@
-import { Component, inject, OnInit, signal, ChangeDetectionStrategy } from '@angular/core';
-import { ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  linkedSignal,
+  OnInit,
+  signal,
+} from '@angular/core';
 import { MatButton } from '@angular/material/button';
 import {
   MAT_DIALOG_DATA,
@@ -15,12 +23,17 @@ import {
   CreateOneBranchGQL,
   UpdateOneBranchGQL,
 } from '@graphql';
+import { ClipAccountToolsService, StorageService } from '@services';
 import {
-  ClipAccountToolsService,
-  FormToolsService,
-  StorageService,
-} from '@services';
-import { map, switchMap } from 'rxjs';
+  applyWhen,
+  form,
+  FormField,
+  FormRoot,
+  maxLength,
+  required,
+} from '@angular/forms/signals';
+import { firstValueFrom, map, switchMap } from 'rxjs';
+import { BranchFormFields } from '@app/types/branches';
 
 @Component({
   selector: 'app-form-dialog',
@@ -30,16 +43,15 @@ import { map, switchMap } from 'rxjs';
     MatFormFieldModule,
     MatInputModule,
     ImagePickerComponent,
-    ReactiveFormsModule,
     MatSelectModule,
+    FormField,
+    FormRoot,
   ],
   templateUrl: './branch-form-dialog.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
 export class BranchFormDialogComponent implements OnInit {
-  public readonly formTools = inject(FormToolsService);
-
   public loading = signal(false);
   public data: BranchPartsFragment | null = inject(MAT_DIALOG_DATA);
   public readonly _storage = inject(StorageService);
@@ -51,133 +63,147 @@ export class BranchFormDialogComponent implements OnInit {
 
   public clipAccountTools = inject(ClipAccountToolsService);
 
-  private previusPicture = '';
+  public readonly isEditing = computed(() => !!this.data?.id);
 
-  public formGroup = this.formTools.builder.group({
-    picture: this.formTools.builder.control<string>('', {
-      validators: [Validators.required],
-      nonNullable: true,
-    }),
-    name: this.formTools.builder.control<string>('', {
-      validators: [Validators.required, Validators.maxLength(16)],
-      nonNullable: true,
-    }),
-    clipAccountID: this.formTools.builder.control<string | null>(null, {
-      validators: [],
-      nonNullable: false,
-    }),
+  private readonly _initialModel = computed<BranchFormFields>(() => ({
+    picture: this.data?.picture ?? '',
+    name: this.data?.name ?? '',
+    clipAccountID: this.data?.clipAccounts.find(() => true)?.id ?? null,
+  }));
+
+  public readonly branchModel = linkedSignal<
+    BranchFormFields,
+    BranchFormFields
+  >({
+    source: this._initialModel,
+    computation: (initial) => ({ ...initial }),
   });
+
+  public readonly branchForm = form(this.branchModel, (schema) => {
+    required(schema.name, { message: 'Campo requerido' });
+    maxLength(schema.name, 16, { message: 'Máximo 16 caracteres' });
+
+    // La imagen es obligatoria únicamente al crear.
+    applyWhen(
+      schema,
+      ({ valueOf }) =>
+        !this.isEditing() &&
+        (!valueOf(schema.picture) || valueOf(schema.picture) === ''),
+      (schema) => {
+        required(schema.picture, { message: 'Seleccione una imagen' });
+      }
+    );
+  });
+
+  private previousPicture = signal('');
+
+  constructor() {
+    effect(() => {
+      this._dialogRef.disableClose = this.loading();
+    });
+
+    effect(() => {
+      const data = this.data;
+      if (data?.picture) {
+        this.previousPicture.set(data.picture);
+      }
+    });
+  }
 
   ngOnInit(): void {
     this.clipAccountTools.fetchAll();
-
-    if (!!this.data?.id) {
-      const clipAccount = this.data.clipAccounts.find(() => true);
-
-      this.formGroup.get('picture')?.clearValidators();
-
-      this.formGroup.patchValue({
-        name: this.data.name,
-        picture: this.data.picture,
-      });
-
-      if (!!clipAccount) {
-        this.formGroup.get('clipAccountID')?.setValue(clipAccount.id);
-      }
-
-      this.previusPicture = this.data.picture;
-      this.formGroup.get('picture')?.updateValueAndValidity();
-    }
   }
 
   public async submit(): Promise<void> {
-    if (this.formGroup.valid) {
-      this.loading.set(true);
+    if (this.branchForm().invalid()) {
+      return;
+    }
 
-      const values = this.formGroup.getRawValue() as any;
+    const values = this.branchModel();
+    this.loading.set(true);
 
-      if (!!this.data?.id) {
-        this._update(values).subscribe({
-          next: (branch) => {
-            this._dialogRef.close(branch);
-          },
-          error: (err) => {
-            console.error('UPDATE BRANCH ERROR: ', err);
-          },
-          complete: () => {
-            this.loading.set(false);
-          },
-        });
-      } else {
-        this._save(values).subscribe({
-          next: (branch) => {
-            this._dialogRef.close(branch);
-          },
-          error: (err) => {
-            console.error('CREATE BRANCH ERROR: ', err);
-          },
-          complete: () => {
-            this.loading.set(false);
-          },
-        });
-      }
+    try {
+      const branch = this.isEditing()
+        ? await this._update(values)
+        : await this._save(values);
+
+      this._dialogRef.close(branch);
+    } catch (err) {
+      console.error(
+        this.isEditing() ? 'UPDATE BRANCH ERROR: ' : 'CREATE BRANCH ERROR: ',
+        err
+      );
+    } finally {
+      this.loading.set(false);
     }
   }
 
-  private _update(values: FormValues) {
-    if (values.picture instanceof File) {
-      return this._storage.delete(this.previusPicture).pipe(
-        switchMap(() => this._storage.upload(values.picture)),
-        switchMap((picture) =>
-          this._updateOneBranch.mutate({
-            variables: {
-              id: this.data!.id,
-              update: { ...values, picture },
-            },
-          })
-        ),
-        map((value) => value.data?.updateOneBranch)
+  private async _update(values: BranchFormFields) {
+    const { picture, name, clipAccountID } = values;
+
+    if (picture instanceof File) {
+      const uploaded = await firstValueFrom(
+        this._storage.delete(this.previousPicture()).pipe(
+          switchMap(() => this._storage.upload(picture))
+        )
       );
+
+      const updated = await firstValueFrom(
+        this._updateOneBranch.mutate({
+          variables: {
+            id: this.data!.id,
+            update: {
+              picture: uploaded,
+              name,
+              clipAccounts: clipAccountID ? [{ id: clipAccountID }] : [],
+            } as any,
+          },
+        })
+      );
+
+      return updated.data?.updateOneBranch;
     }
 
-    return this._updateOneBranch
-      .mutate({
+    const updated = await firstValueFrom(
+      this._updateOneBranch.mutate({
         variables: {
           id: this.data!.id,
           update: {
-            name: values.name,
-            picture: values.picture,
-            clipAccounts: values?.clipAccountID
-              ? [{ id: values.clipAccountID }]
-              : [],
+            name,
+            picture,
+            clipAccounts: clipAccountID ? [{ id: clipAccountID }] : [],
           } as any,
         },
       })
-      .pipe(map((value) => value.data?.updateOneBranch));
+    );
+
+    return updated.data?.updateOneBranch;
   }
 
-  private _save(values: FormValues) {
-    return this._storage.upload(values.picture).pipe(
-      switchMap((picture) =>
-        this._createOneBranch.mutate({
-          variables: {
-            branch: {
-              picture,
-              name: values.name,
-              clipAccounts: values?.clipAccountID
-                ? [{ id: values.clipAccountID }]
-                : [],
+  private async _save(values: BranchFormFields) {
+    const { picture, name, clipAccountID } = values;
+
+    if (!(picture instanceof File)) {
+      throw new Error('La imagen es requerida para crear una sucursal');
+    }
+
+    const uploaded = await firstValueFrom(
+      this._storage.upload(picture).pipe(
+        switchMap((url) =>
+          this._createOneBranch.mutate({
+            variables: {
+              branch: {
+                picture: url,
+                name,
+                clipAccounts: clipAccountID ? [{ id: clipAccountID }] : [],
+              },
             },
-          },
-        })
-      ),
-      map((value) => value.data?.createOneBranch)
+          })
+        ),
+        map((response) => response.data?.createOneBranch)
+      )
     );
+
+    return uploaded;
   }
 }
-
-type FormValues = {
-  picture: File;
-  name: string;
-  clipAccountID: string | null;
-};

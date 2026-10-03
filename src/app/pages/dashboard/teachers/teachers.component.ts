@@ -1,14 +1,12 @@
-import { NgClass } from '@angular/common';
 import {
-  AfterViewInit,
+  ChangeDetectionStrategy,
   Component,
+  effect,
   inject,
   signal,
-  ViewChild,
-  ChangeDetectionStrategy
+  viewChild,
 } from '@angular/core';
-import { FormControl, ReactiveFormsModule } from '@angular/forms';
-import { MatButtonModule, MatIconButton } from '@angular/material/button';
+import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -23,33 +21,31 @@ import {
   TeacherFilter,
   TeacherPartsFragment,
 } from '@graphql';
-import { debounceTime, merge, startWith } from 'rxjs';
+import { toObservable } from '@angular/core/rxjs-interop';
+import { debounceTime } from 'rxjs';
 import { TeacherFormDialogComponent } from './teacher-form-dialog/teacher-form-dialog.component';
 import { TeacherDeleteDialogComponent } from './teacher-delete-dialog/teacher-delete-dialog.component';
 
 @Component({
   selector: 'app-teachers',
   imports: [
-    NgClass,
     MatCardModule,
     MatFormFieldModule,
     MatInputModule,
-    MatFormFieldModule,
     MatButtonModule,
     MatIconModule,
     MatTableModule,
     MatPaginatorModule,
     AvatarComponent,
-    ReactiveFormsModule,
     MatTooltipModule,
   ],
   templateUrl: './teachers.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
-export class TeachersComponent implements AfterViewInit {
-  @ViewChild('paginator') public paginator!: MatPaginator;
-  public searchControl = new FormControl('');
+export class TeachersComponent {
+  public readonly paginator = viewChild.required<MatPaginator>('paginator');
+  public readonly searchTerm = signal('');
 
   public displayedColumns: string[] = ['name', 'actions'];
   public dataSource = new MatTableDataSource<TeacherPartsFragment>([]);
@@ -60,14 +56,48 @@ export class TeachersComponent implements AfterViewInit {
   private readonly dialog = inject(MatDialog);
   private readonly _teachersPageGQL = inject(GetTeachersPageGQL);
 
-  ngAfterViewInit(): void {
-    merge(this.paginator.page, this.searchControl.valueChanges)
-      .pipe(debounceTime(300), startWith({}))
-      .subscribe({
-        next: () => {
-          this.refresh();
-        },
-      });
+  private readonly _debouncedSearchTerm = signal('');
+
+  constructor() {
+    toObservable(this.searchTerm)
+      .pipe(debounceTime(300))
+      .subscribe((term) => this._debouncedSearchTerm.set(term));
+
+    effect(() => {
+      const paginator = this.paginator();
+      const filter = this._buildFilter(this._debouncedSearchTerm());
+
+      const limit = paginator.pageSize;
+      const offset = paginator.pageIndex * limit;
+
+      this._teachersPageGQL
+        .watch({
+          variables: { limit, offset, filter },
+          fetchPolicy: 'cache-and-network',
+          nextFetchPolicy: 'cache-and-network',
+          notifyOnNetworkStatusChange: true,
+        })
+        .valueChanges.subscribe({
+          next: ({ data, loading }) => {
+            const teachers = data?.teachers;
+            const nodes = (teachers?.nodes ?? []) as TeacherPartsFragment[];
+            const totalCount = teachers?.totalCount ?? 0;
+
+            this.dataSource.data = nodes;
+
+            this.loading.set(loading);
+            this.totalCount.set(totalCount);
+          },
+        });
+    });
+  }
+
+  private _buildFilter(term: string): TeacherFilter {
+    return { fullname: { iLike: `%${term}%` } };
+  }
+
+  public onSearchInput(event: Event): void {
+    this.searchTerm.set((event.target as HTMLInputElement).value);
   }
 
   public openFormDialog(
@@ -98,13 +128,12 @@ export class TeachersComponent implements AfterViewInit {
     });
   }
 
-  public refresh() {
-    const limit: number = this.paginator.pageSize;
-    const offset: number = this.paginator.pageIndex * limit;
+  public refresh(): void {
+    const paginator = this.paginator();
+    const filter = this._buildFilter(this.searchTerm());
 
-    const filter: TeacherFilter = {
-      fullname: { iLike: `%${this.searchControl.value}%` },
-    };
+    const limit = paginator.pageSize;
+    const offset = paginator.pageIndex * limit;
 
     this._teachersPageGQL
       .watch({
@@ -119,11 +148,7 @@ export class TeachersComponent implements AfterViewInit {
           const nodes = (teachers?.nodes ?? []) as TeacherPartsFragment[];
           const totalCount = teachers?.totalCount ?? 0;
 
-          this.dataSource.data = nodes.map((node) => {
-            return {
-              ...node,
-            };
-          });
+          this.dataSource.data = nodes;
 
           this.loading.set(loading);
           this.totalCount.set(totalCount);
