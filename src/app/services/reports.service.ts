@@ -8,7 +8,7 @@ import { Observable } from 'rxjs';
   providedIn: 'root',
 })
 export class ReportsService {
-  private readonly apiUri = `${environment.apiUri}/reports`;
+  private readonly apiUri = `${environment.uri}/api/reports`;
 
   private readonly http = inject(HttpClient);
 

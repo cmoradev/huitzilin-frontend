@@ -5,13 +5,13 @@ import { HttpLink } from 'apollo-angular/http';
 import { environment } from '../../environments/environment';
 
 export const provideGraphqlConfig = () => {
-  const { graphqlUri } = environment;
+  const { uri } = environment;
 
   return provideApollo(() => {
     const httpLink = inject(HttpLink);
 
     return {
-      link: httpLink.create({ uri: graphqlUri }),
+      link: httpLink.create({ uri: `${uri}/graphql` }),
       cache: new InMemoryCache({}),
     };
   });

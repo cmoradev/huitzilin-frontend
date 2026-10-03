@@ -1,7 +1,6 @@
 export const environment = {
-    production: true,
-    graphqlUri: 'https://api-huitzilin.softmora.com.mx/graphql',
-    storageUri: 'https://api-storage.softmora.com.mx/api/storage',
-    apiUri: 'https://api-huitzilin.softmora.com.mx/api',
-    storageFolder: 'demo'
-}
+  production: true,
+  uri: 'https://api-huitzilin.softmora.com.mx',
+  storageUri: 'https://api-storage.softmora.com.mx/api/storage',
+  storageFolder: 'demo',
+};
