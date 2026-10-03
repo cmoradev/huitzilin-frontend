@@ -473,7 +473,7 @@ export type CreateEnrollment = {
   levelId: Scalars['String']['input'];
   order: Scalars['Float']['input'];
   packageId: Scalars['String']['input'];
-  periodId?: InputMaybe<Scalars['String']['input']>;
+  periodId: Scalars['String']['input'];
   schedules?: InputMaybe<Array<NestedId>>;
   start: Scalars['String']['input'];
   state: EnrollmentState;

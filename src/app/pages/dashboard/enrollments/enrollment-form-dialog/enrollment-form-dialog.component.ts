@@ -139,7 +139,8 @@ export class EnrollmentFormDialogComponent implements AfterViewInit {
       } else if (
         this._globalStateService.cycle!.id &&
         this._globalStateService.student!.id &&
-        this._globalStateService.branch!.id
+        this._globalStateService.branch!.id &&
+        this._globalStateService.period!.id
       ) {
         this._save(values).subscribe({
           next: (branch) => {
@@ -178,15 +179,11 @@ export class EnrollmentFormDialogComponent implements AfterViewInit {
   private _save(values: FormValues) {
     const cycle = this._globalStateService.cycle!;
 
-    // NOTE: `periodId` es estrictamente requerido por el contrato GraphQL
-    // (`CreateEnrollment.periodId: Scalars['String']['input']`). Se omite
-    // mediante un cast porque el formulario ya no gestiona periodos; si el
-    // backend lo exige no-nulo, esta mutación fallará en runtime hasta que
-    // el esquema/codegen se actualice para marcarlo opcional.
     const enrollment = {
       studentId: this._globalStateService.student!.id,
       branchId: this._globalStateService.branch!.id,
       cycleId: cycle.id,
+      periodId: this._globalStateService.period!.id,
       packageId: values.package.id,
       levelId: values.level.id,
       start: cycle.start,
@@ -197,7 +194,7 @@ export class EnrollmentFormDialogComponent implements AfterViewInit {
       diciplines: 0,
       schedules: [],
       order: 0,
-    } as any;
+    };
 
     return this._createOneEnrollment
       .mutate({ variables: { enrollment } })
