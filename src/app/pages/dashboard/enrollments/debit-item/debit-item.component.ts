@@ -1,5 +1,5 @@
 import { CurrencyPipe, NgClass } from '@angular/common';
-import { Component, EventEmitter, inject, Input, Output } from '@angular/core';
+import { Component, EventEmitter, inject, Input, Output, ChangeDetectionStrategy } from '@angular/core';
 import { MatButtonModule, MatIconButton } from '@angular/material/button';
 import { MatIcon, MatIconModule } from '@angular/material/icon';
 import { MatListModule } from '@angular/material/list';
@@ -21,6 +21,7 @@ import { DebitStatePipe } from '@pipes';
     CurrencyPipe,
   ],
   templateUrl: './debit-item.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './debit-item.component.scss',
 })
 export class DebitItemComponent {

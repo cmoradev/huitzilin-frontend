@@ -1,4 +1,4 @@
-import { Component, inject, input } from '@angular/core';
+import { Component, inject, input, ChangeDetectionStrategy } from '@angular/core';
 import { FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -16,6 +16,7 @@ import { FormToolsService } from '@services';
     ReactiveFormsModule,
   ],
   templateUrl: './charge-form.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
 export class ChargeFormComponent {

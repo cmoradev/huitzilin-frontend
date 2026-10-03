@@ -1,5 +1,5 @@
 import { NgClass } from '@angular/common';
-import { Component, inject, signal, ViewChild } from '@angular/core';
+import { Component, inject, signal, ViewChild, ChangeDetectionStrategy } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -34,6 +34,7 @@ import { PolicyFormDialogComponent } from './policy-form-dialog/policy-form-dial
     ReactiveFormsModule,
   ],
   templateUrl: './policies.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
 export class PoliciesComponent {

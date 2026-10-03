@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 import { MatIconRegistry } from '@angular/material/icon';
 import { DomSanitizer } from '@angular/platform-browser';
 import { RouterOutlet } from '@angular/router';
@@ -21,6 +21,7 @@ Decimal.set({
   selector: 'app-root',
   imports: [RouterOutlet],
   template: '<router-outlet />',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
 export class AppComponent {

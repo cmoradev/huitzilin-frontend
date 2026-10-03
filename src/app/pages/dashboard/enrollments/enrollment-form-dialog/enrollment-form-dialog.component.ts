@@ -1,4 +1,4 @@
-import { AfterViewInit, Component, inject, signal } from '@angular/core';
+import { AfterViewInit, Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatButtonModule } from '@angular/material/button';
@@ -43,6 +43,7 @@ type EnrollmentFormDialogData = EnrollmentPartsFragment | null;
     ReactiveFormsModule,
   ],
   templateUrl: './enrollment-form-dialog.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
 export class EnrollmentFormDialogComponent implements AfterViewInit {

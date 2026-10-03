@@ -7,6 +7,7 @@ import {
   inject,
   Input,
   Output,
+  ChangeDetectionStrategy
 } from '@angular/core';
 import { MatIconButton } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -29,6 +30,7 @@ import { GlobalStateService } from '@services';
     NgClass
   ],
   templateUrl: './enrollment-item.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './enrollment-item.component.scss',
 })
 export class EnrollmentItemComponent {

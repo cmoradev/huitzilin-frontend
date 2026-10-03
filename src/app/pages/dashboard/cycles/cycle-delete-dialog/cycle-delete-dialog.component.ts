@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { MatButton } from '@angular/material/button';
 import { CyclePartsFragment, DeleteOneCycleGQL } from '@graphql';
 import {
@@ -20,6 +20,7 @@ import {
     MatButton,
   ],
   templateUrl: './cycle-delete-dialog.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
 export class CycleDeleteDialogComponent {

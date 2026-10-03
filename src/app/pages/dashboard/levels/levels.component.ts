@@ -1,5 +1,5 @@
 import { NgClass } from '@angular/common';
-import { Component, inject, signal, ViewChild } from '@angular/core';
+import { Component, inject, signal, ViewChild, ChangeDetectionStrategy } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import {
@@ -44,6 +44,7 @@ import { LevelFormDialogComponent } from './level-form-dialog/level-form-dialog.
     DragDropModule,
   ],
   templateUrl: './levels.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './levels.component.scss',
 })
 export class LevelsComponent {

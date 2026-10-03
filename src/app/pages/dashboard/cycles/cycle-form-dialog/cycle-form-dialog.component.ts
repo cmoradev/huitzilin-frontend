@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButton, MatButtonModule } from '@angular/material/button';
 import {
@@ -32,6 +32,7 @@ import { map } from 'rxjs';
     ReactiveFormsModule,
   ],
   templateUrl: './cycle-form-dialog.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
 export class CycleFormDialogComponent {

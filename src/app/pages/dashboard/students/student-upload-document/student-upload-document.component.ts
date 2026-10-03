@@ -1,4 +1,4 @@
-import { Component, EventEmitter, inject, Input, Output, signal } from '@angular/core';
+import { Component, EventEmitter, inject, Input, Output, signal, ChangeDetectionStrategy } from '@angular/core';
 import { AddStudentsToDocumentGQL, CreateOneDocumentGQL } from '@graphql';
 import { StorageService } from '@services';
 import { map, switchMap } from 'rxjs';
@@ -7,6 +7,7 @@ import { map, switchMap } from 'rxjs';
   selector: 'app-student-upload-document',
   imports: [],
   templateUrl: './student-upload-document.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
 export class StudentUploadDocumentComponent {

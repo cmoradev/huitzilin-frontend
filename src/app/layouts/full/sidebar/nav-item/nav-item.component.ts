@@ -1,4 +1,4 @@
-import { Component, inject, Input } from '@angular/core';
+import { Component, inject, Input, ChangeDetectionStrategy } from '@angular/core';
 import { MatIcon } from '@angular/material/icon';
 import {
   MatListItem,
@@ -12,6 +12,7 @@ import { RouteItem } from '@routes';
   selector: 'app-nav-item',
   imports: [MatListItem, MatListItemTitle, MatListItemIcon, MatIcon],
   templateUrl: './nav-item.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
 export class NavItemComponent {

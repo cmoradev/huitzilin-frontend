@@ -1,5 +1,5 @@
 import { CurrencyPipe, NgClass } from '@angular/common';
-import { Component, inject, signal, ViewChild } from '@angular/core';
+import { Component, inject, signal, ViewChild, ChangeDetectionStrategy } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatDialog } from '@angular/material/dialog';
@@ -34,6 +34,7 @@ import { MatButtonModule } from '@angular/material/button';
     CurrencyPipe
   ],
   templateUrl: './discounts.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
 export class DiscountsComponent {

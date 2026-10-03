@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
@@ -10,6 +10,7 @@ import { NgClass } from '@angular/common';
   selector: 'app-reports',
   imports: [MatCardModule, MatIconModule, MatButtonModule, RouterLink, NgClass],
   templateUrl: './reports.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
 export class ReportsComponent {

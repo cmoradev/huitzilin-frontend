@@ -6,6 +6,7 @@ import {
   inject,
   output,
   signal,
+  ChangeDetectionStrategy
 } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
@@ -33,6 +34,7 @@ import { MatIconModule } from '@angular/material/icon';
     MatIconModule,
 ],
   templateUrl: './sale-details.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./sale-details.component.scss'],
 })
 export class SaleDetailsComponent {

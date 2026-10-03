@@ -8,6 +8,7 @@ import {
   output,
   signal,
   TemplateRef,
+  ChangeDetectionStrategy
 } from '@angular/core';
 import { SchedulePartsFragment } from '@graphql';
 import { DayOfWeekPipe } from '@pipes';
@@ -23,6 +24,7 @@ export type CalendarSlot = {
   selector: 'app-calendar',
   imports: [DayOfWeekPipe, DatePipe, NgClass, NgTemplateOutlet],
   templateUrl: './calendar.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './calendar.component.scss',
 })
 export class CalendarComponent implements OnChanges {

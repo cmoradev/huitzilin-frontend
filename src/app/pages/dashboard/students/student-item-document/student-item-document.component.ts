@@ -5,6 +5,7 @@ import {
   Input,
   Output,
   signal,
+  ChangeDetectionStrategy
 } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -17,6 +18,7 @@ import { map, switchMap } from 'rxjs';
   selector: 'app-student-item-document',
   imports: [MatButtonModule, MatIconModule],
   templateUrl: './student-item-document.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
 export class StudentItemDocumentComponent {

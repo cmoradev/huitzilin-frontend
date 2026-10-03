@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import {
   MAT_DIALOG_DATA,
@@ -12,6 +12,7 @@ import { DayOfWeekPipe } from '@pipes';
   selector: 'app-calendar-delete-dialog',
   imports: [MatDialogModule, MatButtonModule, DayOfWeekPipe],
   templateUrl: './calendar-delete-dialog.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
 export class CalendarDeleteDialogComponent {

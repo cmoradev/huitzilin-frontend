@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import {
   FormArray,
   FormGroup,
@@ -77,6 +77,7 @@ const defaultDueDate = `${format(
     MatIconModule,
   ],
   templateUrl: './debit-form-dialog.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
 export class DebitFormDialogComponent {

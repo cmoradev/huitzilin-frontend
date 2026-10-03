@@ -7,6 +7,7 @@ import {
   OnInit,
   signal,
   ViewChild,
+  ChangeDetectionStrategy
 } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -59,6 +60,7 @@ import { RouterLink } from "@angular/router";
     RouterLink
 ],
   templateUrl: './incomes.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
 export class IncomesComponent implements AfterViewInit, OnInit {

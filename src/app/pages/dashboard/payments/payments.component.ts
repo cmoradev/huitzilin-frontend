@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, inject, OnInit, signal, ChangeDetectionStrategy } from '@angular/core';
 import { MatCardModule } from '@angular/material/card';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatIconModule } from '@angular/material/icon';
@@ -27,6 +27,7 @@ import { SaleDetailsComponent } from './sale-details/sale-details.component';
     EnrollmentWithDebitsComponent,
   ],
   templateUrl: './payments.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
 export class PaymentsComponent implements OnInit {

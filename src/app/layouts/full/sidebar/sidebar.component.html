@@ -6,7 +6,7 @@
     (click)="toggleSidenavRight.emit()"
   >
     <img
-      [src]="currentBranch()?.picture"
+      [src]="$safeNavigationMigration(currentBranch()?.picture)"
       class="rounded-[var(--mat-sys-corner-medium)] w-10 h-10"
     />
     <span class="w-full text-lg"> {{ currentBranch()?.name }} </span>

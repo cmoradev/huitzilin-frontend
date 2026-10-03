@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, output } from '@angular/core';
+import { Component, inject, OnInit, output, ChangeDetectionStrategy } from '@angular/core';
 import { ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -26,6 +26,7 @@ import { concatMap, groupBy, mergeMap, of, toArray, zip } from 'rxjs';
     MatCheckboxModule,
   ],
   templateUrl: './action-form.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
 export class ActionFormComponent implements OnInit {

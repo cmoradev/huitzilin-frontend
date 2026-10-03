@@ -1,5 +1,5 @@
 import { CurrencyPipe } from '@angular/common';
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { Component, EventEmitter, Input, Output, ChangeDetectionStrategy } from '@angular/core';
 import { MatIconButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { MatMenuModule, MatMenuTrigger } from '@angular/material/menu';
@@ -10,6 +10,7 @@ import { FrequencyPipe } from '@pipes';
   selector: 'app-fee-item',
   imports: [MatIcon, MatIconButton, MatMenuModule, FrequencyPipe, CurrencyPipe],
   templateUrl: './fee-item.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: `./fee-item.component.scss`,
 })
 export class FeeItemComponent {

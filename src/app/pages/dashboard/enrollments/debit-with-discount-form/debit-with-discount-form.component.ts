@@ -1,5 +1,5 @@
 import { CurrencyPipe, JsonPipe } from '@angular/common';
-import { Component, inject, Input, OnInit, output, signal } from '@angular/core';
+import { Component, inject, Input, OnInit, output, signal, ChangeDetectionStrategy } from '@angular/core';
 import {
   FormArray,
   FormGroup,
@@ -44,6 +44,7 @@ import { toObservable } from '@angular/core/rxjs-interop';
     CurrencyPipe,
   ],
   templateUrl: './debit-with-discount-form.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
 export class DebitWithDiscountFormComponent implements OnInit {

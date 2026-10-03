@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, inject, OnInit, signal, ChangeDetectionStrategy } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatTabsModule } from '@angular/material/tabs';
 import {
@@ -36,6 +36,7 @@ import { paymentIcons, paymentNames } from '@utils/contains';
     MatError,
   ],
   templateUrl: './charge-dialog.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
 export class ChargeDialogComponent implements OnInit {

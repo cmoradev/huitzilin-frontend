@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { DeleteOneLevelGQL, LevelPartsFragment } from '@graphql';
@@ -10,6 +10,7 @@ import { DeleteOneLevelGQL, LevelPartsFragment } from '@graphql';
     MatButtonModule,
   ],
   templateUrl: './level-delete-dialog.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
 export class LevelDeleteDialogComponent {

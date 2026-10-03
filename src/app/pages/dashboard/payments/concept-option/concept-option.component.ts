@@ -7,6 +7,7 @@ import {
   input,
   output,
   signal,
+  ChangeDetectionStrategy
 } from '@angular/core';
 import { toObservable } from '@angular/core/rxjs-interop';
 import { ReactiveFormsModule } from '@angular/forms';
@@ -33,6 +34,7 @@ import { CompletePaymentDialogComponent } from '../complete-payment-dialog/compl
     ReactiveFormsModule,
   ],
   templateUrl: './concept-option.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./concept-option.component.scss'],
 })
 export class ConceptOptionComponent implements AfterViewInit {

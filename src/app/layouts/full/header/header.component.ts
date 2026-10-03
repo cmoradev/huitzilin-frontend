@@ -6,6 +6,7 @@ import {
   inject,
   Input,
   Output,
+  ChangeDetectionStrategy
 } from '@angular/core';
 import { MatToolbar } from '@angular/material/toolbar';
 import {
@@ -28,6 +29,7 @@ import { AuthService, GlobalStateService } from '@services';
     MatMenuTrigger,
     MatMenuItem,
   ],
+  changeDetection: ChangeDetectionStrategy.Eager,
   templateUrl: './header.component.html',
 })
 export class HeaderComponent {

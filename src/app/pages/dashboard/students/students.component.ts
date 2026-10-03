@@ -1,5 +1,5 @@
 import { NgClass } from '@angular/common';
-import { AfterViewInit, Component, inject, signal, ViewChild } from '@angular/core';
+import { AfterViewInit, Component, inject, signal, ViewChild, ChangeDetectionStrategy } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatIconButton } from '@angular/material/button';
 import {
@@ -42,6 +42,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
     MatTooltipModule,
   ],
   templateUrl: './students.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
 export class StudentsComponent implements AfterViewInit {

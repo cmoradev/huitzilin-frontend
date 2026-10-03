@@ -3,7 +3,7 @@ import {
   DragDropModule,
   moveItemInArray,
 } from '@angular/cdk/drag-drop';
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, inject, OnInit, signal, ChangeDetectionStrategy } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -56,6 +56,7 @@ import { LightOnPricesComponent } from './light-on-prices/light-on-prices.compon
     EnrollmentItemComponent,
   ],
   templateUrl: './enrollments.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
 export class EnrollmentsComponent implements OnInit {

@@ -4,6 +4,7 @@ import {
   inject,
   signal,
   ViewChild,
+  ChangeDetectionStrategy
 } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatIconButton } from '@angular/material/button';
@@ -56,6 +57,7 @@ import { NgClass } from '@angular/common';
     ReactiveFormsModule,
   ],
   templateUrl: './branches.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
 export class BranchsComponent implements AfterViewInit {

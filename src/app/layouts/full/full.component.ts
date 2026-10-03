@@ -1,5 +1,5 @@
 import { BreakpointObserver } from '@angular/cdk/layout';
-import { Component, inject, signal, ViewChild } from '@angular/core';
+import { Component, inject, signal, ViewChild, ChangeDetectionStrategy } from '@angular/core';
 import {
   MatListSubheaderCssMatStyler,
   MatNavList,
@@ -39,6 +39,7 @@ const TABLET_VIEW = 'screen and (min-width: 769px) and (max-width: 1024px)';
     GlobalStateSettingsComponent,
   ],
   templateUrl: './full.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./full.component.scss'],
 })
 export class FullComponent {

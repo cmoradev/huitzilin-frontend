@@ -92,7 +92,7 @@
           } @else if (discountFormGroup.get('type')?.value === 'FIXED') {
           <span
             >-
-            {{ discountFormGroup.get("value")?.value | currency : "MXN" }}</span
+            {{ $safeNavigationMigration(discountFormGroup.get("value")?.value) | currency : "MXN" }}</span
           >
           }
 

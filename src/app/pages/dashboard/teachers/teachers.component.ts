@@ -5,6 +5,7 @@ import {
   inject,
   signal,
   ViewChild,
+  ChangeDetectionStrategy
 } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule, MatIconButton } from '@angular/material/button';
@@ -43,6 +44,7 @@ import { TeacherDeleteDialogComponent } from './teacher-delete-dialog/teacher-de
     MatTooltipModule,
   ],
   templateUrl: './teachers.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
 export class TeachersComponent implements AfterViewInit {

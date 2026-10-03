@@ -72,7 +72,7 @@
             <span
               >-
               {{
-                discountFormGroup.get("value")?.value | currency : "MXN"
+                $safeNavigationMigration(discountFormGroup.get("value")?.value) | currency : "MXN"
               }}</span
             >
             }

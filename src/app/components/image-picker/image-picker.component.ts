@@ -1,5 +1,5 @@
 import { NgStyle } from '@angular/common';
-import { Component, forwardRef, Input, Optional, Self } from '@angular/core';
+import { Component, forwardRef, Input, Optional, Self, ChangeDetectionStrategy } from '@angular/core';
 import {
   ControlValueAccessor,
   NG_VALUE_ACCESSOR,
@@ -10,6 +10,7 @@ import {
   selector: 'app-image-picker',
   imports: [NgStyle],
   templateUrl: './image-picker.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   providers: [
     {
       provide: NG_VALUE_ACCESSOR,

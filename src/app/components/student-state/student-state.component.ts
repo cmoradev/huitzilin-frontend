@@ -7,6 +7,7 @@ import {
   input,
   OnInit,
   signal,
+  ChangeDetectionStrategy
 } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import {
@@ -38,6 +39,7 @@ import { debounceTime, filter, merge, startWith } from 'rxjs';
     AvatarComponent,
   ],
   templateUrl: './student-state.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
 export class StudentStateComponent implements AfterViewInit, OnInit {

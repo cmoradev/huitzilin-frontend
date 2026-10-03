@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, inject, OnInit, signal, ChangeDetectionStrategy } from '@angular/core';
 import {
   FormArray,
   FormControl,
@@ -49,6 +49,7 @@ import { DELINQUENCY_VALUE } from '@utils/contains';
     DebitWithDiscountFormComponent,
   ],
   templateUrl: './light-on-prices.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
 export class LightOnPricesComponent implements OnInit {

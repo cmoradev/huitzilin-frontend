@@ -1,5 +1,5 @@
 import { CurrencyPipe } from '@angular/common';
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import {
   MAT_DIALOG_DATA,
@@ -13,6 +13,7 @@ import { DeleteOneDiscountGQL, DiscountPartsFragment } from '@graphql';
   selector: 'app-discount-delete-dialog',
   imports: [MatDialogModule, MatButtonModule, CurrencyPipe],
   templateUrl: './discount-delete-dialog.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
 export class DiscountDeleteDialogComponent {

@@ -1,5 +1,5 @@
 import { NgClass } from '@angular/common';
-import { Component, computed, EventEmitter, inject, Input, Output } from '@angular/core';
+import { Component, computed, EventEmitter, inject, Input, Output, ChangeDetectionStrategy } from '@angular/core';
 import { MatIconButton } from '@angular/material/button';
 import { MatIcon } from '@angular/material/icon';
 import { MatMenuModule, MatMenuTrigger } from '@angular/material/menu';
@@ -18,6 +18,7 @@ import { GlobalStateService } from '@services';
     DragDropModule
   ],
   templateUrl: './activity-item.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: `./activity-item.component.scss`,
 })
 export class ActivityItemComponent {

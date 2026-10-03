@@ -5,6 +5,7 @@ import {
   inject,
   signal,
   ViewChild,
+  ChangeDetectionStrategy
 } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -37,6 +38,7 @@ import { UserPoliciesDialogComponent } from './user-policies-dialog/user-policie
     ReactiveFormsModule,
   ],
   templateUrl: './users.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
 export class UsersComponent implements AfterViewInit {

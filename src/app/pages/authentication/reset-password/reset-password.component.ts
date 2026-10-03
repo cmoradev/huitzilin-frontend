@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 import { MatButton } from '@angular/material/button';
 import { MatCard, MatCardContent } from '@angular/material/card';
 import { MatFormField, MatHint, MatLabel } from '@angular/material/form-field';
@@ -17,6 +17,7 @@ import { Router } from '@angular/router';
     MatButton
   ],
   templateUrl: './reset-password.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``
 })
 export class ResetPasswordComponent {

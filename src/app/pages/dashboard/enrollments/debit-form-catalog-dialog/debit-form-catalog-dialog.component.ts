@@ -1,5 +1,5 @@
 import { CurrencyPipe } from '@angular/common';
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, inject, OnInit, signal, ChangeDetectionStrategy } from '@angular/core';
 import {
   FormArray,
   FormGroup,
@@ -58,6 +58,7 @@ const defaultDueDate = `${format(
     DebitWithDiscountFormComponent,
   ],
   templateUrl: './debit-form-catalog-dialog.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
 export class DebitFormCatalogDialogComponent implements OnInit {

@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { MatButton } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogActions, MatDialogClose, MatDialogContent, MatDialogRef, MatDialogTitle } from '@angular/material/dialog';
 import { PackagePartsFragment, DeleteOnePackageGQL } from '@graphql';
@@ -13,6 +13,7 @@ import { PackagePartsFragment, DeleteOnePackageGQL } from '@graphql';
     MatButton,
   ],
   templateUrl: './activity-delete-dialog.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
 export class ActivityDeleteDialogComponent {

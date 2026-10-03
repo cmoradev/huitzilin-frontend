@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 import { MatButton } from '@angular/material/button';
 import { MatCard, MatCardContent } from '@angular/material/card';
 import { MatFormField, MatHint, MatLabel } from '@angular/material/form-field';
@@ -18,6 +18,7 @@ import { Router, RouterLink } from '@angular/router';
     RouterLink
   ],
   templateUrl: './forgot.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``
 })
 export class ForgotComponent {

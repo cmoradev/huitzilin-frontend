@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { MatButton } from '@angular/material/button';
 import {
   MatDialogActions,
@@ -22,6 +22,7 @@ import { BranchPartsFragment, DeleteOneBranchGQL } from '@graphql';
     AvatarComponent,
   ],
   templateUrl: './branch-delete-dialog.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
 export class BranchDeleteDialogComponent {

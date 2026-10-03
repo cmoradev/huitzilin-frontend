@@ -1,4 +1,4 @@
-import { Component, inject, input, OnInit, signal } from '@angular/core';
+import { Component, inject, input, OnInit, signal, ChangeDetectionStrategy } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
@@ -25,6 +25,7 @@ import { PosService } from '@services';
     ConceptOptionComponent,
   ],
   templateUrl: './enrollment-with-debits.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./enrollment-with-debits.component.scss'],
 })
 export class EnrollmentWithDebitsComponent implements OnInit {

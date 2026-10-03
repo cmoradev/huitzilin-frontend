@@ -1,12 +1,12 @@
 # AGENTS.md
 
 ## Stack And Entry Points
-- Single Angular 19 app, not a monorepo. Project name `huitzilin-web`, component selector prefix `app` (from `angular.json`). `src/main.ts` bootstraps a standalone app through `src/app/app.config.ts`.
+- Single Angular 22 app, not a monorepo. Project name `huitzilin-web`, component selector prefix `app` (from `angular.json`). `src/main.ts` bootstraps a standalone app through `src/app/app.config.ts`.
 - Top-level routing lives in `src/app/app.routes.ts`: `authentication/*` uses `BlankComponent`, everything else uses `FullComponent` plus `isAuthGuard` (`canActivate`) and `permissionGuard` (`canActivateChild`).
 - Dashboard feature pages live under `src/app/pages/dashboard/**` and are lazy-loaded via `loadChildren` (`dashboard.routes.ts`) which then uses `loadComponent` per page.
 
 ## Commands
-- Use Node `v22.14.0` from `.nvmrc` for repo-consistent behavior.
+- Use Node `v22.22.3` (or higher compatible: any 22.x/24.x/26.x release that satisfies Angular's `engines` range) from `.nvmrc` for repo-consistent behavior.
 - Install with `npm install`.
 - Dev server: `npm start` (defaults to development configuration).
 - Production-style verification: `npm run build`. This is the main check — there is no lint or dedicated typecheck script.

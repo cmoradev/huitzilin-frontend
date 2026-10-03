@@ -6,6 +6,7 @@ import {
   inject,
   OnInit,
   Output,
+  ChangeDetectionStrategy
 } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import {
@@ -49,6 +50,7 @@ import { debounceTime } from 'rxjs';
     ReactiveFormsModule,
   ],
   templateUrl: './global-state-settings.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
 export class GlobalStateSettingsComponent implements AfterViewInit, OnInit {

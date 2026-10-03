@@ -1,4 +1,4 @@
-import { Component, computed, EventEmitter, inject, Output } from '@angular/core';
+import { Component, computed, EventEmitter, inject, Output, ChangeDetectionStrategy } from '@angular/core';
 import { ReactiveFormsModule } from '@angular/forms';
 import { MatRippleModule } from '@angular/material/core';
 import { MatToolbarModule } from '@angular/material/toolbar';
@@ -8,6 +8,7 @@ import { GlobalStateService } from '@services';
   selector: 'app-sidebar',
   imports: [MatToolbarModule, MatRippleModule, ReactiveFormsModule],
   templateUrl: './sidebar.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
 export class SidebarComponent {

@@ -1,4 +1,4 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, inject, OnInit, signal, ChangeDetectionStrategy } from '@angular/core';
 import { MatCardModule } from '@angular/material/card';
 import { MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
 import {
@@ -25,6 +25,7 @@ import { StudentItemDocumentComponent } from "../student-item-document/student-i
     StudentItemDocumentComponent
 ],
   templateUrl: './student-documents-dialog.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: ``,
 })
 export class StudentDocumentsDialogComponent implements OnInit {
