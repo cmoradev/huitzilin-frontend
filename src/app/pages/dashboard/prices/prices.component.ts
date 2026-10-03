@@ -25,7 +25,7 @@ import {
 } from '@graphql';
 import { GlobalStateService } from '@services';
 import { NgScrollbar } from 'ngx-scrollbar';
-import { debounceTime, map, merge } from 'rxjs';
+import { debounceTime, map, merge, tap } from 'rxjs';
 import { ActivityDeleteDialogComponent } from './activity-delete-dialog/activity-delete-dialog.component';
 import { ActivityFormDialogComponent } from './activity-form-dialog/activity-form-dialog.component';
 import { ActivityItemComponent } from './activity-item/activity-item.component';
@@ -169,19 +169,31 @@ export class PricesComponent implements OnInit {
 
       this.activitiesLoading.set(true);
 
-      const getActivities$ = this._packagesPageGQL.watch(params, {
-        fetchPolicy: 'cache-and-network',
-        nextFetchPolicy: 'cache-and-network',
-        notifyOnNetworkStatusChange: true,
-      }).valueChanges;
+      const getActivities$ = this._packagesPageGQL
+        .watch({
+          variables: params,
+          fetchPolicy: 'cache-and-network',
+          nextFetchPolicy: 'cache-and-network',
+          notifyOnNetworkStatusChange: true,
+        })
+        .valueChanges;
 
-      getActivities$.pipe(map((resp) => resp.data.packages)).subscribe({
-        next: ({ nodes, totalCount }) => {
-          const allItems = accumulared.concat(nodes);
+      getActivities$.pipe(
+        tap((resp) => this.activitiesLoading.set(resp.loading)),
+        map((resp) => resp.data?.packages)
+      ).subscribe({
+        next: (packages) => {
+          if (!packages) {
+            return;
+          }
+
+          const { nodes = [], totalCount = 0 } = packages;
+          const typedNodes = nodes as PackagePartsFragment[];
+
+          const allItems = accumulared.concat(typedNodes);
 
           if (allItems.length >= totalCount) {
             this.activities.set(allItems);
-            this.activitiesLoading.set(false);
             this.activitiesTotalCount.set(totalCount);
             return; // No more activities to fetch
           }
@@ -213,19 +225,31 @@ export class PricesComponent implements OnInit {
 
       this.feesLoading.set(true);
 
-      const getFees$ = this._feesPageGQL.watch(params, {
-        fetchPolicy: 'cache-and-network',
-        nextFetchPolicy: 'cache-and-network',
-        notifyOnNetworkStatusChange: true,
-      }).valueChanges;
+      const getFees$ = this._feesPageGQL
+        .watch({
+          variables: params,
+          fetchPolicy: 'cache-and-network',
+          nextFetchPolicy: 'cache-and-network',
+          notifyOnNetworkStatusChange: true,
+        })
+        .valueChanges;
 
-      getFees$.pipe(map((resp) => resp.data.fees)).subscribe({
-        next: ({ nodes, totalCount }) => {
-          const allItems = accumulared.concat(nodes);
+      getFees$.pipe(
+        tap((resp) => this.feesLoading.set(resp.loading)),
+        map((resp) => resp.data?.fees)
+      ).subscribe({
+        next: (fees) => {
+          if (!fees) {
+            return;
+          }
+
+          const { nodes = [], totalCount = 0 } = fees;
+          const typedNodes = nodes as FeePartsFragment[];
+
+          const allItems = accumulared.concat(typedNodes);
 
           if (allItems.length >= totalCount) {
             this.fees.set(allItems);
-            this.feesLoading.set(false);
             this.feesTotalCount.set(totalCount);
             return; // No more fees to fetch
           }
@@ -260,7 +284,7 @@ export class PricesComponent implements OnInit {
       order: index + 1,
     }));
 
-    this._setOrderActivitiesGQL.mutate({ payload }).subscribe({
+    this._setOrderActivitiesGQL.mutate({ variables: { payload } }).subscribe({
       next: () => {
         this._snackBar.open(
           'Se ha actualizado el orden correctamente',

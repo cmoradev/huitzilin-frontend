@@ -26,7 +26,7 @@ import {
 } from '@graphql';
 import { GlobalStateService } from '@services';
 import { NgScrollbar } from 'ngx-scrollbar';
-import { debounceTime, map, merge } from 'rxjs';
+import { debounceTime, map, merge, tap } from 'rxjs';
 import { CalendarFormDialogComponent } from './calendar-form-dialog/calendar-form-dialog.component';
 import { CalendarDeleteDialogComponent } from './calendar-delete-dialog/calendar-delete-dialog.component';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
@@ -194,19 +194,31 @@ export class CalendarPageComponent {
 
       this.periodsLoading.set(true);
 
-      const getPeriods$ = this._periodsPageGQL.watch(params, {
-        fetchPolicy: 'cache-and-network',
-        nextFetchPolicy: 'cache-and-network',
-        notifyOnNetworkStatusChange: true,
-      }).valueChanges;
+      const getPeriods$ = this._periodsPageGQL
+        .watch({
+          variables: params,
+          fetchPolicy: 'cache-and-network',
+          nextFetchPolicy: 'cache-and-network',
+          notifyOnNetworkStatusChange: true,
+        })
+        .valueChanges;
 
-      getPeriods$.pipe(map((resp) => resp.data.periods)).subscribe({
-        next: ({ nodes, totalCount }) => {
-          const allItems = accumulared.concat(nodes);
+      getPeriods$.pipe(
+        tap((resp) => this.periodsLoading.set(resp.loading)),
+        map((resp) => resp.data?.periods)
+      ).subscribe({
+        next: (periods) => {
+          if (!periods) {
+            return;
+          }
+
+          const { nodes = [], totalCount = 0 } = periods;
+          const typedNodes = nodes as PeriodPartsFragment[];
+
+          const allItems = accumulared.concat(typedNodes);
 
           if (allItems.length >= totalCount) {
             this.periods.set(allItems);
-            this.periodsLoading.set(false);
             this.periodsTotalCount.set(totalCount);
             return; // No more activities to fetch
           }
@@ -238,19 +250,31 @@ export class CalendarPageComponent {
 
       this.schedulesLoading.set(true);
 
-      const getSchedules$ = this._schedulesPageGQL.watch(params, {
-        fetchPolicy: 'cache-and-network',
-        nextFetchPolicy: 'cache-and-network',
-        notifyOnNetworkStatusChange: true,
-      }).valueChanges;
+      const getSchedules$ = this._schedulesPageGQL
+        .watch({
+          variables: params,
+          fetchPolicy: 'cache-and-network',
+          nextFetchPolicy: 'cache-and-network',
+          notifyOnNetworkStatusChange: true,
+        })
+        .valueChanges;
 
-      getSchedules$.pipe(map((resp) => resp.data.schedules)).subscribe({
-        next: ({ nodes, totalCount }) => {
-          const allItems = accumulared.concat(nodes);
+      getSchedules$.pipe(
+        tap((resp) => this.schedulesLoading.set(resp.loading)),
+        map((resp) => resp.data?.schedules)
+      ).subscribe({
+        next: (schedules) => {
+          if (!schedules) {
+            return;
+          }
+
+          const { nodes = [], totalCount = 0 } = schedules;
+          const typedNodes = nodes as SchedulePartsFragment[];
+
+          const allItems = accumulared.concat(typedNodes);
 
           if (allItems.length >= totalCount) {
             this.schedules.set(allItems);
-            this.schedulesLoading.set(false);
             this.schedulesTotalCount.set(totalCount);
             return; // No more fees to fetch
           }
@@ -285,7 +309,7 @@ export class CalendarPageComponent {
       order: index + 1,
     }));
 
-    this._setOrderPeriodsGQL.mutate({ payload }).subscribe({
+    this._setOrderPeriodsGQL.mutate({ variables: { payload } }).subscribe({
       next: () => {
         this._snackBar.open(
           'Se ha actualizado el orden correctamente',

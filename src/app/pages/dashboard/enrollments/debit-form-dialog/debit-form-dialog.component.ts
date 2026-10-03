@@ -283,24 +283,26 @@ export class DebitFormDialogComponent {
 
         this._createManyDebits
           .mutate({
-            debits: debits.map((debit: any) => ({
-              description: debit.description,
-              unitPrice: debit.unitPrice,
-              discount: debit.discount,
-              dueDate: debit.dueDate,
-              quantity: debit.quantity,
-              state: debit.state,
-              withTax: debit.withTax,
-              frequency: debit.frequency,
-              delinquency: debit.delinquency,
-              paymentDate: null,
-              studentId: this._globalStateService.student!.id,
-              branchId: this._globalStateService.branch!.id,
-              discounts: debit.discounts.map((discount: any) => ({
-                id: discount.id,
+            variables: {
+              debits: debits.map((debit: any) => ({
+                description: debit.description,
+                unitPrice: debit.unitPrice,
+                discount: debit.discount,
+                dueDate: debit.dueDate,
+                quantity: debit.quantity,
+                state: debit.state,
+                withTax: debit.withTax,
+                frequency: debit.frequency,
+                delinquency: debit.delinquency,
+                paymentDate: null,
+                studentId: this._globalStateService.student!.id,
+                branchId: this._globalStateService.branch!.id,
+                discounts: debit.discounts.map((discount: any) => ({
+                  id: discount.id,
+                })),
+                enrollmentId: this._globalStateService.enrollment!.id,
               })),
-              enrollmentId: this._globalStateService.enrollment!.id,
-            })),
+            },
           })
           .pipe(map((resp) => resp.data?.createManyDebits))
           .subscribe({
@@ -316,8 +318,10 @@ export class DebitFormDialogComponent {
   private _update(values: UpdateDebit) {
     return this._updateOneDebit
       .mutate({
-        id: this.data!.id,
-        update: { ...values },
+        variables: {
+          id: this.data!.id,
+          update: { ...values },
+        },
       })
       .pipe(map((value) => value.data?.updateOneDebit));
   }

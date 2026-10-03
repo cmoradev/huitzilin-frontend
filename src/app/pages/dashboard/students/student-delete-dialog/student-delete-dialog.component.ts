@@ -42,7 +42,7 @@ export class StudentDeleteDialogComponent {
       this.loading.set(true);
 
       this._deleteOneStudentGQL
-        .mutate({ id: this.data.id })
+        .mutate({ variables: { id: this.data.id } })
         .subscribe({
           next: (student) => {
             this._dialogRef.close(student.data?.deleteOneStudent);

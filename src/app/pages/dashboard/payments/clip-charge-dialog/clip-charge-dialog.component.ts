@@ -74,9 +74,11 @@ export class ClipChargeDialogComponent {
     if (!!studentIDs.length) {
       this._createLinkIncomes
         .mutate({
-          input: {
-            concepts,
-            studentIDs,
+          variables: {
+            input: {
+              concepts,
+              studentIDs,
+            },
           },
         })
         .subscribe({

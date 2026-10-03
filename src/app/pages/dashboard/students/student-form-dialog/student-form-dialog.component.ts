@@ -168,17 +168,19 @@ export class StudentFormDialogComponent implements OnInit {
     return uploadPicture$.pipe(
       switchMap((picture) =>
         this._updateOneStudent.mutate({
-          id: this.data!.id,
-          update: {
-            picture,
-            firstname: values.firstname,
-            lastname: values.lastname,
-            dateBirth: values.dateBirth,
-            dni: values.dni,
-            active: values.active,
-            branchs: values.branchIds.map((branchId) => ({
-              id: branchId,
-            })),
+          variables: {
+            id: this.data!.id,
+            update: {
+              picture,
+              firstname: values.firstname,
+              lastname: values.lastname,
+              dateBirth: values.dateBirth,
+              dni: values.dni,
+              active: values.active,
+              branchs: values.branchIds.map((branchId) => ({
+                id: branchId,
+              })),
+            },
           },
         })
       )
@@ -195,16 +197,18 @@ export class StudentFormDialogComponent implements OnInit {
     return uploadPicture$.pipe(
       switchMap((picture) =>
         this._createOneStudent.mutate({
-          student: {
-            picture,
-            firstname: values.firstname,
-            lastname: values.lastname,
-            dateBirth: values.dateBirth,
-            dni: values.dni,
-            active: values.active,
-            branchs: values.branchIds.map((branchId) => ({
-              id: branchId,
-            })),
+          variables: {
+            student: {
+              picture,
+              firstname: values.firstname,
+              lastname: values.lastname,
+              dateBirth: values.dateBirth,
+              dni: values.dni,
+              active: values.active,
+              branchs: values.branchIds.map((branchId) => ({
+                id: branchId,
+              })),
+            },
           },
         })
       )

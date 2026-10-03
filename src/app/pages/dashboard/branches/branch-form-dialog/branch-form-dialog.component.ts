@@ -129,8 +129,10 @@ export class BranchFormDialogComponent implements OnInit {
         switchMap(() => this._storage.upload(values.picture)),
         switchMap((picture) =>
           this._updateOneBranch.mutate({
-            id: this.data!.id,
-            update: { ...values, picture },
+            variables: {
+              id: this.data!.id,
+              update: { ...values, picture },
+            },
           })
         ),
         map((value) => value.data?.updateOneBranch)
@@ -139,14 +141,16 @@ export class BranchFormDialogComponent implements OnInit {
 
     return this._updateOneBranch
       .mutate({
-        id: this.data!.id,
-        update: {
-          name: values.name,
-          picture: values.picture,
-          clipAccounts: values?.clipAccountID
-            ? [{ id: values.clipAccountID }]
-            : [],
-        } as any,
+        variables: {
+          id: this.data!.id,
+          update: {
+            name: values.name,
+            picture: values.picture,
+            clipAccounts: values?.clipAccountID
+              ? [{ id: values.clipAccountID }]
+              : [],
+          } as any,
+        },
       })
       .pipe(map((value) => value.data?.updateOneBranch));
   }
@@ -155,12 +159,14 @@ export class BranchFormDialogComponent implements OnInit {
     return this._storage.upload(values.picture).pipe(
       switchMap((picture) =>
         this._createOneBranch.mutate({
-          branch: {
-            picture,
-            name: values.name,
-            clipAccounts: values?.clipAccountID
-              ? [{ id: values.clipAccountID }]
-              : [],
+          variables: {
+            branch: {
+              picture,
+              name: values.name,
+              clipAccounts: values?.clipAccountID
+                ? [{ id: values.clipAccountID }]
+                : [],
+            },
           },
         })
       ),

@@ -117,17 +117,17 @@ export class StudentsComponent implements AfterViewInit {
     };
 
     this._companiesPageGQL
-      .watch(
-        { limit, offset, filter },
-        {
-          fetchPolicy: 'cache-and-network',
-          nextFetchPolicy: 'cache-and-network',
-          notifyOnNetworkStatusChange: true,
-        }
-      )
+      .watch({
+        variables: { limit, offset, filter },
+        fetchPolicy: 'cache-and-network',
+        nextFetchPolicy: 'cache-and-network',
+        notifyOnNetworkStatusChange: true,
+      })
       .valueChanges.subscribe({
         next: ({ data, loading }) => {
-          const { nodes, totalCount } = data.students;
+          const students = data?.students;
+          const nodes = (students?.nodes ?? []) as StudentPartsFragment[];
+          const totalCount = students?.totalCount ?? 0;
 
           this.dataSource.data = nodes.map((node) => {
             return {

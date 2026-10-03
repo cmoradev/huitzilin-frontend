@@ -29,7 +29,9 @@ export class ActivityDeleteDialogComponent {
     if (!!this.data.id) {
       this.loading.set(true);
 
-      this._deleteOnePackage.mutate({ id: this.data.id }).subscribe({
+      this._deleteOnePackage
+        .mutate({ variables: { id: this.data.id } })
+        .subscribe({
         next: (branch) => {
           this._dialogRef.close(branch.data?.deleteOnePackage);
         },

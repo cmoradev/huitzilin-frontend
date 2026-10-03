@@ -103,11 +103,13 @@ export class CycleFormDialogComponent {
   private _update(values: FormValues) {
     return this._updateOneCycle
       .mutate({
-        id: this.data!.id,
-        update: {
-          ...values,
-          start: new Date(values.start).toISOString(),
-          end: new Date(values.end).toISOString(),
+        variables: {
+          id: this.data!.id,
+          update: {
+            ...values,
+            start: new Date(values.start).toISOString(),
+            end: new Date(values.end).toISOString(),
+          },
         },
       })
       .pipe(map((value) => value.data?.updateOneCycle));
@@ -116,10 +118,12 @@ export class CycleFormDialogComponent {
   private _save(values: FormValues) {
     return this._createOneCycle
       .mutate({
-        cycle: {
-          ...values,
-          start: new Date(values.start).toISOString(),
-          end: new Date(values.end).toISOString(),
+        variables: {
+          cycle: {
+            ...values,
+            start: new Date(values.start).toISOString(),
+            end: new Date(values.end).toISOString(),
+          },
         },
       })
       .pipe(map((value) => value.data?.createOneCycle));

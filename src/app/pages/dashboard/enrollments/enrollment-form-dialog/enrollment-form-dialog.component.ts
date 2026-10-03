@@ -158,15 +158,17 @@ export class EnrollmentFormDialogComponent implements AfterViewInit {
   private _update(values: FormValues) {
     return this._updateOneEnrollment
       .mutate({
-        id: this.data!.id,
-        update: {
-          details: values.details,
-          state: values.state,
-          packageId: values.package.id,
-          levelId: values.level.id,
-          hours: 0,
-          diciplines: 0,
-          schedules: [],
+        variables: {
+          id: this.data!.id,
+          update: {
+            details: values.details,
+            state: values.state,
+            packageId: values.package.id,
+            levelId: values.level.id,
+            hours: 0,
+            diciplines: 0,
+            schedules: [],
+          },
         },
       })
       .pipe(map((value) => value.data?.updateOneEnrollment));
@@ -197,7 +199,7 @@ export class EnrollmentFormDialogComponent implements AfterViewInit {
     } as any;
 
     return this._createOneEnrollment
-      .mutate({ enrollment })
+      .mutate({ variables: { enrollment } })
       .pipe(map((value) => value.data?.createOneEnrollment));
   }
 }

@@ -30,7 +30,9 @@ export class DiscountDeleteDialogComponent {
     if (!!this.data.id) {
       this.loading.set(true);
 
-      this._deleteOneDiscount.mutate({ id: this.data.id }).subscribe({
+      this._deleteOneDiscount
+        .mutate({ variables: { id: this.data.id } })
+        .subscribe({
         next: (cycle) => {
           this._dialogRef.close(cycle.data?.deleteOneDiscount);
           this._snackBar.open('Se ha eliminado correctamente', 'Cerrar', {

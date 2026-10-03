@@ -40,7 +40,9 @@ export class DebitDeleteDialogComponent {
     if (!!this.data.id) {
       this.loading.set(true);
 
-      this._deleteOneDebit.mutate({ id: this.data.id }).subscribe({
+      this._deleteOneDebit
+        .mutate({ variables: { id: this.data.id } })
+        .subscribe({
         next: (debit) => {
           this._dialogRef.close(debit.data?.deleteOneDebit);
         },

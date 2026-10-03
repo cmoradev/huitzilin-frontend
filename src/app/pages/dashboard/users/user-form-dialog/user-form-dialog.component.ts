@@ -114,12 +114,14 @@ export class UserFormDialogComponent implements OnInit {
       if (!!this.data?.id) {
         this.updateOneUserGQL
           .mutate({
-            id: this.data?.id,
-            update: {
-              email: values.email,
-              username: values.username,
-              branchId: values.branchId,
-              cycleId: values.cycleId,
+            variables: {
+              id: this.data?.id,
+              update: {
+                email: values.email,
+                username: values.username,
+                branchId: values.branchId,
+                cycleId: values.cycleId,
+              },
             },
           })
           .subscribe({
@@ -135,12 +137,14 @@ export class UserFormDialogComponent implements OnInit {
       } else {
         this.createOneUserGQL
           .mutate({
-            input: {
-              email: values.email,
-              username: values.username,
-              password: values.password,
-              branchId: values.branchId,
-              cycleId: values.cycleId,
+            variables: {
+              input: {
+                email: values.email,
+                username: values.username,
+                password: values.password,
+                branchId: values.branchId,
+                cycleId: values.cycleId,
+              },
             },
           })
           .subscribe({

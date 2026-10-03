@@ -59,10 +59,12 @@ export class UserPoliciesDialogComponent implements OnInit {
 
       this.updateOneUserGQL
         .mutate({
-          id: this.data?.id,
-          update: {
-            policies:
-              this.policiesFormControl.value?.map((id) => ({ id })) ?? [],
+          variables: {
+            id: this.data?.id,
+            update: {
+              policies:
+                this.policiesFormControl.value?.map((id) => ({ id })) ?? [],
+            },
           },
         })
         .subscribe({
@@ -89,14 +91,22 @@ export class UserPoliciesDialogComponent implements OnInit {
       offset,
     };
 
-    const fetch$ = this._fetch.watch(variables, {
-      fetchPolicy: 'cache-and-network', // Usa cache primero, solo pide a la API si no hay datos en cache
-      nextFetchPolicy: 'cache-and-network', // Mantiene la política de cache en siguientes peticiones
-      notifyOnNetworkStatusChange: false, // No notifica cambios de red para evitar refetch innecesario
-    }).valueChanges;
+    const fetch$ = this._fetch
+      .watch({
+        variables,
+        fetchPolicy: 'cache-and-network', // Usa cache primero, solo pide a la API si no hay datos en cache
+        nextFetchPolicy: 'cache-and-network', // Mantiene la política de cache en siguientes peticiones
+        notifyOnNetworkStatusChange: false, // No notifica cambios de red para evitar refetch innecesario
+      })
+      .valueChanges;
 
-    fetch$.pipe(map((resp) => resp.data.policies)).subscribe({
-      next: ({ nodes, totalCount }) => {
+    fetch$.pipe(map((resp) => resp.data?.policies)).subscribe({
+      next: (policies) => {
+        if (!policies) return;
+
+        const nodes = (policies.nodes ?? []) as PolicyPartsFragment[];
+        const totalCount = policies.totalCount ?? 0;
+
         const allItems = accumulared.concat(nodes);
 
         if (allItems.length >= totalCount) {
@@ -115,17 +125,18 @@ export class UserPoliciesDialogComponent implements OnInit {
 
   private fetchUserPolicies(userId: string): void {
     this.getUserPoliciesGQL
-      .watch(
-        { id: userId },
-        {
-          fetchPolicy: 'cache-and-network',
-          nextFetchPolicy: 'cache-and-network',
-        }
-      )
+      .watch({
+        variables: { id: userId },
+        fetchPolicy: 'cache-and-network',
+        nextFetchPolicy: 'cache-and-network',
+      })
       .valueChanges.subscribe({
         next: ({ data }) => {
+          const userPolicies = data?.user?.policies ?? [];
           this.policiesFormControl.setValue(
-            data.user.policies.map((policy) => policy.id)
+            userPolicies
+              .map((policy) => policy?.id)
+              .filter((id) => typeof id === 'string') as string[]
           );
         },
         error: (error) => {

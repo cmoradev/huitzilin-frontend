@@ -104,8 +104,8 @@ export class StudentStateComponent implements AfterViewInit, OnInit {
       this.loadingStudents.set(true);
 
       this._fetchStudentGQL
-        .watch(
-          {
+        .watch({
+          variables: {
             limit: 50,
             offset: 0,
             filter: {
@@ -118,17 +118,17 @@ export class StudentStateComponent implements AfterViewInit, OnInit {
               ],
             },
           },
-          {
-            fetchPolicy: 'cache-and-network',
-            nextFetchPolicy: 'cache-and-network',
-            notifyOnNetworkStatusChange: true,
-          }
-        )
+          fetchPolicy: 'cache-and-network',
+          nextFetchPolicy: 'cache-and-network',
+          notifyOnNetworkStatusChange: true,
+        })
         .valueChanges.subscribe({
           next: ({ loading, data }) => {
             this.loadingStudents.set(loading);
 
-            this.students.set(data?.students.nodes ?? []);
+            this.students.set(
+              (data?.students?.nodes ?? []) as StudentPartsFragment[]
+            );
           },
         });
     }

@@ -130,11 +130,13 @@ export class DisciplineFormDialogComponent {
   private _update(values: FormValues) {
     return this._updateOneDiscipline
       .mutate({
-        id: this.data!.id,
-        update: {
-          name: values.name,
-          minHours: values.minHours,
-          packages: values.packages!.map((id) => ({ id })),
+        variables: {
+          id: this.data!.id,
+          update: {
+            name: values.name,
+            minHours: values.minHours,
+            packages: values.packages!.map((id) => ({ id })),
+          },
         },
       })
       .pipe(map((value) => value.data?.updateOneDiscipline));
@@ -143,11 +145,13 @@ export class DisciplineFormDialogComponent {
   private _save(values: FormValues) {
     return this._createOneDiscipline
       .mutate({
-        discipline: {
-          name: values.name,
-          minHours: values.minHours,
-          packages: values.packages!.map((id) => ({ id })),
-          branchId: this._globalStateService.branch!.id,
+        variables: {
+          discipline: {
+            name: values.name,
+            minHours: values.minHours,
+            packages: values.packages!.map((id) => ({ id })),
+            branchId: this._globalStateService.branch!.id,
+          },
         },
       })
       .pipe(map((value) => value.data?.createOneDiscipline));
@@ -164,14 +168,22 @@ export class DisciplineFormDialogComponent {
         offset,
       };
 
-      const getPackages$ = this._getPackagesPage.watch(params, {
-        fetchPolicy: 'cache-and-network', // Usa cache primero, solo pide a la API si no hay datos en cache
-        nextFetchPolicy: 'cache-and-network', // Mantiene la política de cache en siguientes peticiones
-        notifyOnNetworkStatusChange: false, // No notifica cambios de red para evitar refetch innecesario
-      }).valueChanges;
+      const getPackages$ = this._getPackagesPage
+        .watch({
+          variables: params,
+          fetchPolicy: 'cache-and-network', // Usa cache primero, solo pide a la API si no hay datos en cache
+          nextFetchPolicy: 'cache-and-network', // Mantiene la política de cache en siguientes peticiones
+          notifyOnNetworkStatusChange: false, // No notifica cambios de red para evitar refetch innecesario
+        })
+        .valueChanges;
 
-      getPackages$.pipe(map((resp) => resp.data.packages)).subscribe({
-        next: ({ nodes, totalCount }) => {
+      getPackages$.pipe(map((resp) => resp.data?.packages)).subscribe({
+        next: (packages) => {
+          if (!packages) return;
+
+          const nodes = (packages.nodes ?? []) as PackagePartsFragment[];
+          const totalCount = packages.totalCount ?? 0;
+
           const allItems = accumulared.concat(nodes);
 
           if (allItems.length >= totalCount) {

@@ -21,18 +21,27 @@ export class CycleToolsService {
       filter: { name: { iLike: `%${query}%` } },
     };
 
-    const fetch$ = this._fetch.watch(variables, {
-      fetchPolicy: 'cache-and-network',
-      nextFetchPolicy: 'cache-and-network',
-      notifyOnNetworkStatusChange: true,
-    }).valueChanges;
+    const fetch$ = this._fetch
+      .watch({
+        variables,
+        fetchPolicy: 'cache-and-network',
+        nextFetchPolicy: 'cache-and-network',
+        notifyOnNetworkStatusChange: true,
+      })
+      .valueChanges;
 
     fetch$
       .pipe(
         map(({ data, loading }) => {
+          const nodes = data?.cycles?.nodes as CyclePartsFragment[];
+          if (!data || !nodes) {
+            this.loading.set(loading);
+            return [];
+          }
+
           this.loading.set(loading);
-          this.options.set(data.cycles.nodes);
-          return data.cycles.nodes;
+          this.options.set(nodes);
+          return nodes;
         })
       )
       .subscribe({
@@ -53,15 +62,25 @@ export class CycleToolsService {
       offset,
     };
 
-    const fetch$ = this._fetch.watch(variables, {
-      fetchPolicy: 'cache-and-network', // Usa cache primero, solo pide a la API si no hay datos en cache
-      nextFetchPolicy: 'cache-and-network', // Mantiene la política de cache en siguientes peticiones
-      notifyOnNetworkStatusChange: false, // No notifica cambios de red para evitar refetch innecesario
-    }).valueChanges;
+    const fetch$ = this._fetch
+      .watch({
+        variables,
+        fetchPolicy: 'cache-and-network', // Usa cache primero, solo pide a la API si no hay datos en cache
+        nextFetchPolicy: 'cache-and-network', // Mantiene la política de cache en siguientes peticiones
+        notifyOnNetworkStatusChange: false, // No notifica cambios de red para evitar refetch innecesario
+      })
+      .valueChanges;
 
-    fetch$.pipe(map((resp) => resp.data.cycles)).subscribe({
-      next: ({ nodes, totalCount }) => {
-        const allItems = accumulared.concat(nodes);
+    fetch$.pipe(map((resp) => resp.data?.cycles)).subscribe({
+      next: (cycles) => {
+        if (!cycles) {
+          return;
+        }
+
+        const { nodes = [], totalCount = 0 } = cycles;
+        const typedNodes = nodes as CyclePartsFragment[];
+
+        const allItems = accumulared.concat(typedNodes);
 
         if (allItems.length >= totalCount) {
           this.options.set(allItems);
@@ -73,6 +92,7 @@ export class CycleToolsService {
       },
       error: (error) => {
         console.error('Error fetching disciplines', error);
+        this.loading.set(false);
       },
     });
   }

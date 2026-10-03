@@ -26,7 +26,9 @@ export class LevelDeleteDialogComponent {
     if (!!this.data.id) {
       this.loading.set(true);
 
-      this._deleteOneLevel.mutate({ id: this.data.id }).subscribe({
+      this._deleteOneLevel
+        .mutate({ variables: { id: this.data.id } })
+        .subscribe({
         next: (cycle) => {
           this._dialogRef.close(cycle.data?.deleteOneLevel);
         },

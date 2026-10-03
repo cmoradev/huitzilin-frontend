@@ -106,17 +106,18 @@ export class DisciplinesComponent {
       };
 
       this._disciplinesPageGQL
-        .watch(
-          { limit, offset, filter },
-          {
-            fetchPolicy: 'cache-and-network',
-            nextFetchPolicy: 'cache-and-network',
-            notifyOnNetworkStatusChange: true,
-          }
-        )
+        .watch({
+          variables: { limit, offset, filter },
+          fetchPolicy: 'cache-and-network',
+          nextFetchPolicy: 'cache-and-network',
+          notifyOnNetworkStatusChange: true,
+        })
         .valueChanges.subscribe({
           next: ({ data, loading }) => {
-            const { nodes, totalCount } = data.disciplines;
+            const disciplines = data?.disciplines;
+            const nodes = (disciplines?.nodes ??
+              []) as DisciplinePartsFragment[];
+            const totalCount = disciplines?.totalCount ?? 0;
 
             this.dataSource.data = nodes;
 

@@ -68,17 +68,17 @@ export class PoliciesComponent {
     };
 
     this._policiesPageGQL
-      .watch(
-        { limit, offset, filter },
-        {
-          fetchPolicy: 'cache-and-network',
-          nextFetchPolicy: 'cache-and-network',
-          notifyOnNetworkStatusChange: true,
-        }
-      )
+      .watch({
+        variables: { limit, offset, filter },
+        fetchPolicy: 'cache-and-network',
+        nextFetchPolicy: 'cache-and-network',
+        notifyOnNetworkStatusChange: true,
+      })
       .valueChanges.subscribe({
         next: ({ data, loading }) => {
-          const { nodes, totalCount } = data.policies;
+          const policies = data?.policies;
+          const nodes = (policies?.nodes ?? []) as PolicyPartsFragment[];
+          const totalCount = policies?.totalCount ?? 0;
 
           this.dataSource.data = nodes;
 

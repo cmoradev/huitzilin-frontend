@@ -8,6 +8,23 @@ import { Router, RouterLink } from '@angular/router';
 import { AuthService, FormToolsService } from '@services';
 import { ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
+import { CombinedGraphQLErrors } from '@apollo/client/core';
+
+interface ErrorExtensions {
+  readonly statusCode?: number;
+  readonly originalError?: { readonly statusCode?: number };
+}
+
+function readStatusCode(err: unknown): number | undefined {
+  if (!CombinedGraphQLErrors.is(err)) {
+    return undefined;
+  }
+
+  const first = err.errors[0];
+  const extensions = first?.extensions as ErrorExtensions | undefined;
+
+  return extensions?.statusCode ?? extensions?.originalError?.statusCode;
+}
 
 @Component({
   selector: 'app-login',
@@ -62,15 +79,15 @@ export class LoginComponent {
           this.router.navigate(['/']);
         },
         error: (err) => {
-          const error = err?.cause?.extensions?.originalError || null;
+          const statusCode = readStatusCode(err);
 
-          if (error?.statusCode === 401) {
+          if (statusCode === 401) {
             this.formGroup.get('password')?.setErrors({
               unauthenticated: true,
             });
           }
 
-          if (error?.statusCode === 409) {
+          if (statusCode === 409) {
             this.formGroup.get('username')?.setErrors({
               userNotFound: true,
             });

@@ -184,7 +184,7 @@ export class ScheduleFormDialogComponent {
 
       this._deleteOneSchedule
         .mutate({
-          id: this.data!.id,
+          variables: { id: this.data!.id },
         })
         .subscribe({
           next: () => {
@@ -208,14 +208,16 @@ export class ScheduleFormDialogComponent {
   private _update(values: FormValues) {
     return this._updateOneSchedule
       .mutate({
-        id: this.data!.id,
-        update: {
-          day: parseInt(values.day, 10),
-          start: values.start.toTimeString().slice(0, 5),
-          end: values.end.toTimeString().slice(0, 5),
-          levels: values.levels!.map((id) => ({ id })),
-          disciplineId: values.discipline!.id,
-          teacherId: values.teacher!.id,
+        variables: {
+          id: this.data!.id,
+          update: {
+            day: parseInt(values.day, 10),
+            start: values.start.toTimeString().slice(0, 5),
+            end: values.end.toTimeString().slice(0, 5),
+            levels: values.levels!.map((id) => ({ id })),
+            disciplineId: values.discipline!.id,
+            teacherId: values.teacher!.id,
+          },
         },
       })
       .pipe(map((value) => value.data?.updateOneSchedule));
@@ -224,15 +226,17 @@ export class ScheduleFormDialogComponent {
   private _save(values: FormValues) {
     return this._createOneSchedule
       .mutate({
-        schedule: {
-          day: parseInt(values.day, 10),
-          start: values.start.toTimeString().slice(0, 5),
-          end: values.end.toTimeString().slice(0, 5),
-          disciplineId: values.discipline!.id,
-          teacherId: values.teacher!.id,
-          periodId: this._globalStateService.period!.id,
-          branchId: this._globalStateService.branch!.id,
-          levels: values.levels!.map((id) => ({ id })),
+        variables: {
+          schedule: {
+            day: parseInt(values.day, 10),
+            start: values.start.toTimeString().slice(0, 5),
+            end: values.end.toTimeString().slice(0, 5),
+            disciplineId: values.discipline!.id,
+            teacherId: values.teacher!.id,
+            periodId: this._globalStateService.period!.id,
+            branchId: this._globalStateService.branch!.id,
+            levels: values.levels!.map((id) => ({ id })),
+          },
         },
       })
       .pipe(map((value) => value.data?.createOneSchedule));

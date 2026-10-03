@@ -98,17 +98,17 @@ export class ClipAccountsComponent {
     };
 
     this._clipAccountsPageGQL
-      .watch(
-        { limit, offset, filter },
-        {
-          fetchPolicy: 'cache-and-network',
-          nextFetchPolicy: 'cache-and-network',
-          notifyOnNetworkStatusChange: true,
-        }
-      )
+      .watch({
+        variables: { limit, offset, filter },
+        fetchPolicy: 'cache-and-network',
+        nextFetchPolicy: 'cache-and-network',
+        notifyOnNetworkStatusChange: true,
+      })
       .valueChanges.subscribe({
         next: ({ data, loading }) => {
-          const { nodes, totalCount } = data.clipAccounts;
+          const clipAccounts = data?.clipAccounts;
+          const nodes = (clipAccounts?.nodes ?? []) as ClipAccountPartsFragment[];
+          const totalCount = clipAccounts?.totalCount ?? 0;
 
           this.dataSource.data = nodes;
 

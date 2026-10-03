@@ -67,14 +67,22 @@ export class EnrollmentWithDebitsComponent implements OnInit {
         offset,
       };
 
-      const getDebits$ = this._getDebitsPage.watch(params, {
-        fetchPolicy: 'cache-and-network', // Usa cache primero, solo pide a la API si no hay datos en cache
-        nextFetchPolicy: 'cache-and-network', // Mantiene la política de cache en siguientes peticiones
-        notifyOnNetworkStatusChange: false, // No notifica cambios de red para evitar refetch innecesario
-      }).valueChanges;
+      const getDebits$ = this._getDebitsPage
+        .watch({
+          variables: params,
+          fetchPolicy: 'cache-and-network', // Usa cache primero, solo pide a la API si no hay datos en cache
+          nextFetchPolicy: 'cache-and-network', // Mantiene la política de cache en siguientes peticiones
+          notifyOnNetworkStatusChange: false, // No notifica cambios de red para evitar refetch innecesario
+        })
+        .valueChanges;
 
-      getDebits$.pipe(map((resp) => resp.data.debits)).subscribe({
-        next: ({ nodes, totalCount }) => {
+      getDebits$.pipe(map((resp) => resp.data?.debits)).subscribe({
+        next: (debits) => {
+          if (!debits) return;
+
+          const nodes = (debits.nodes ?? []) as DebitPartsFragment[];
+          const totalCount = debits.totalCount ?? 0;
+
           const allItems = accumulared.concat(nodes);
 
           if (allItems.length >= totalCount) {

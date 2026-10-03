@@ -122,14 +122,16 @@ export class TeacherFormDialogComponent {
     return uploadPicture$.pipe(
       switchMap((picture) =>
         this._updateOneTeacher.mutate({
-          id: this.data!.id,
-          update: {
-            picture,
-            firstname: values.firstname,
-            lastname: values.lastname,
-            branchs: values.branchIds.map((branchId) => ({
-              id: branchId,
-            })),
+          variables: {
+            id: this.data!.id,
+            update: {
+              picture,
+              firstname: values.firstname,
+              lastname: values.lastname,
+              branchs: values.branchIds.map((branchId) => ({
+                id: branchId,
+              })),
+            },
           },
         })
       )
@@ -146,13 +148,15 @@ export class TeacherFormDialogComponent {
     return uploadPicture$.pipe(
       switchMap((picture) =>
         this._createOneTeacher.mutate({
-          teacher: {
-            picture,
-            firstname: values.firstname,
-            lastname: values.lastname,
-            branchs: values.branchIds.map((branchId) => ({
-              id: branchId,
-            })),
+          variables: {
+            teacher: {
+              picture,
+              firstname: values.firstname,
+              lastname: values.lastname,
+              branchs: values.branchIds.map((branchId) => ({
+                id: branchId,
+              })),
+            },
           },
         })
       )

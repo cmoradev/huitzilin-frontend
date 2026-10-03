@@ -109,17 +109,17 @@ export class CyclesComponent {
     };
 
     this._cyclesPageGQL
-      .watch(
-        { limit, offset, filter },
-        {
-          fetchPolicy: 'cache-and-network',
-          nextFetchPolicy: 'cache-and-network',
-          notifyOnNetworkStatusChange: true,
-        }
-      )
+      .watch({
+        variables: { limit, offset, filter },
+        fetchPolicy: 'cache-and-network',
+        nextFetchPolicy: 'cache-and-network',
+        notifyOnNetworkStatusChange: true,
+      })
       .valueChanges.subscribe({
         next: ({ data, loading }) => {
-          const { nodes, totalCount } = data.cycles;
+          const cycles = data?.cycles;
+          const nodes = (cycles?.nodes ?? []) as CyclePartsFragment[];
+          const totalCount = cycles?.totalCount ?? 0;
 
           this.dataSource.data = nodes;
 

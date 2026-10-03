@@ -36,7 +36,9 @@ export class CycleDeleteDialogComponent {
     if (!!this.data.id) {
       this.loading.set(true);
 
-      this._deleteOneCycle.mutate({ id: this.data.id }).subscribe({
+      this._deleteOneCycle
+        .mutate({ variables: { id: this.data.id } })
+        .subscribe({
         next: (cycle) => {
           this._dialogRef.close(cycle.data?.deleteOneCycle);
         },

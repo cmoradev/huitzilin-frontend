@@ -69,10 +69,12 @@ export class PolicyFormDialogComponent {
       if (!!this.data?.id) {
         this.updateOnePolicyGQL
           .mutate({
-            id: this.data?.id,
-            update: {
-              name: values.name,
-              actions: this.actions(),
+            variables: {
+              id: this.data?.id,
+              update: {
+                name: values.name,
+                actions: this.actions(),
+              },
             },
           })
           .subscribe({
@@ -88,9 +90,11 @@ export class PolicyFormDialogComponent {
       } else {
         this.createOnePolicyGQL
           .mutate({
-            policy: {
-              name: values.name,
-              actions: this.actions(),
+            variables: {
+              policy: {
+                name: values.name,
+                actions: this.actions(),
+              },
             },
           })
           .subscribe({

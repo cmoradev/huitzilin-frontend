@@ -23,7 +23,9 @@ export class UserDeleteDialogComponent {
     if (!!this.data.id) {
       this.loading.set(true);
 
-      this._deleteOneUser.mutate({ id: this.data.id }).subscribe({
+      this._deleteOneUser
+        .mutate({ variables: { id: this.data.id } })
+        .subscribe({
         next: (user) => {
           this._dialogRef.close(user.data?.deleteOneUser);
         },

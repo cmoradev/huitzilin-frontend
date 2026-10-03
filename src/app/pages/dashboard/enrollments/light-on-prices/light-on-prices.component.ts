@@ -225,24 +225,26 @@ export class LightOnPricesComponent implements OnInit {
       ) {
         this._createManyDebits
           .mutate({
-            debits: values.debits.map((debit: any) => ({
-              description: debit.description,
-              unitPrice: debit.unitPrice,
-              discount: debit.discount,
-              dueDate: debit.dueDate,
-              quantity: debit.quantity,
-              state: debit.state,
-              withTax: debit.withTax,
-              frequency: debit.frequency,
-              paymentDate: null,
-              studentId: this._globalState.student!.id,
-              branchId: this._globalState.branch!.id,
-              delinquency: DELINQUENCY_VALUE,
-              discounts: debit.discounts.map((discount: any) => ({
-                id: discount.id,
+            variables: {
+              debits: values.debits.map((debit: any) => ({
+                description: debit.description,
+                unitPrice: debit.unitPrice,
+                discount: debit.discount,
+                dueDate: debit.dueDate,
+                quantity: debit.quantity,
+                state: debit.state,
+                withTax: debit.withTax,
+                frequency: debit.frequency,
+                paymentDate: null,
+                studentId: this._globalState.student!.id,
+                branchId: this._globalState.branch!.id,
+                delinquency: DELINQUENCY_VALUE,
+                discounts: debit.discounts.map((discount: any) => ({
+                  id: discount.id,
+                })),
+                enrollmentId: this._globalState.enrollment!.id,
               })),
-              enrollmentId: this._globalState.enrollment!.id,
-            })),
+            },
           })
           .pipe(map((resp) => resp.data?.createManyDebits))
           .subscribe({

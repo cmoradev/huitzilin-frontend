@@ -7,7 +7,7 @@ import {
 } from '@angular/forms';
 import { FetchStudentGQL, GetUsersPageGQL } from '@graphql';
 import { ERROR_MESSAGES } from '@utils/messages';
-import { map } from 'rxjs';
+import { catchError, map, of } from 'rxjs';
 
 @Injectable({
   providedIn: 'root',
@@ -98,8 +98,8 @@ export class FormToolsService {
   public get isStudentCodeValid(): AsyncValidatorFn {
     return (control) => {
       return this._fetchStudentPage
-        .fetch(
-          {
+        .fetch({
+          variables: {
             filter: {
               or: [
                 { code: { eq: control.value } },
@@ -107,14 +107,21 @@ export class FormToolsService {
               ],
             },
           },
-          { fetchPolicy: 'network-only' }
-        )
+          fetchPolicy: 'network-only',
+        })
         .pipe(
           map((resp) => {
-            const student = resp.data.students.nodes.find((value) => value.id);
+            if (resp.error) {
+              return { notAvailable: true };
+            }
+
+            const student = resp.data?.students?.nodes?.find(
+              (value) => value?.id
+            );
 
             return student ? null : { studentNotFound: true };
-          })
+          }),
+          catchError(() => of({ notAvailable: true }))
         );
     };
   }
@@ -122,40 +129,54 @@ export class FormToolsService {
   public get isUsernameValid(): AsyncValidatorFn {
     return (control) =>
       this._fetchUsersPage
-        .fetch(
-          {
+        .fetch({
+          variables: {
             filter: {
               username: { eq: control.value },
             },
           },
-          { fetchPolicy: 'network-only' }
-        )
+          fetchPolicy: 'network-only',
+        })
         .pipe(
           map((resp) => {
-            const user = resp.data.users.nodes.find((value) => value?.id);
+            if (resp.error) {
+              return { notAvailable: true };
+            }
+
+            const user = resp.data?.users?.nodes?.find(
+              (value) => value?.id
+            );
 
             return user ? { usernameIsExists: true } : null;
-          })
+          }),
+          catchError(() => of({ notAvailable: true }))
         );
   }
 
   public get isDniStudentValid(): AsyncValidatorFn {
     return (control) =>
       this._fetchStudentPage
-        .fetch(
-          {
+        .fetch({
+          variables: {
             filter: {
               dni: { eq: control.value },
             },
           },
-          { fetchPolicy: 'network-only' }
-        )
+          fetchPolicy: 'network-only',
+        })
         .pipe(
           map((resp) => {
-            const student = resp.data.students.nodes.find((value) => value?.id);
+            if (resp.error) {
+              return { notAvailable: true };
+            }
+
+            const student = resp.data?.students?.nodes?.find(
+              (value) => value?.id
+            );
 
             return student ? { dniIsExists: true } : null;
-          })
+          }),
+          catchError(() => of({ notAvailable: true }))
         );
   }
 

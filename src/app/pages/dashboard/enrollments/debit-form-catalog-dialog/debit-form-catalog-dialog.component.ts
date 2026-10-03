@@ -178,24 +178,26 @@ export class DebitFormCatalogDialogComponent implements OnInit {
       ) {
         this._createManyDebits
           .mutate({
-            debits: values.debits.map((debit: any) => ({
-              description: debit.description,
-              unitPrice: debit.unitPrice,
-              discount: debit.discount,
-              dueDate: debit.dueDate,
-              quantity: debit.quantity,
-              state: debit.state,
-              withTax: debit.withTax,
-              frequency: debit.frequency,
-              delinquency: debit.delinquency,
-              paymentDate: null,
-              studentId: this._globalStateService.student!.id,
-              branchId: this._globalStateService.branch!.id,
-              discounts: debit.discounts.map((discount: any) => ({
-                id: discount.id,
+            variables: {
+              debits: values.debits.map((debit: any) => ({
+                description: debit.description,
+                unitPrice: debit.unitPrice,
+                discount: debit.discount,
+                dueDate: debit.dueDate,
+                quantity: debit.quantity,
+                state: debit.state,
+                withTax: debit.withTax,
+                frequency: debit.frequency,
+                delinquency: debit.delinquency,
+                paymentDate: null,
+                studentId: this._globalStateService.student!.id,
+                branchId: this._globalStateService.branch!.id,
+                discounts: debit.discounts.map((discount: any) => ({
+                  id: discount.id,
+                })),
+                enrollmentId: this._globalStateService.enrollment!.id,
               })),
-              enrollmentId: this._globalStateService.enrollment!.id,
-            })),
+            },
           })
           .pipe(map((resp) => resp.data?.createManyDebits))
           .subscribe({
@@ -277,14 +279,22 @@ export class DebitFormCatalogDialogComponent implements OnInit {
         offset,
       };
 
-      const getFees$ = this._feesPageGQL.watch(params, {
-        fetchPolicy: 'cache-and-network', // Usa cache primero, solo pide a la API si no hay datos en cache
-        nextFetchPolicy: 'cache-and-network', // Mantiene la política de cache en siguientes peticiones
-        notifyOnNetworkStatusChange: false, // No notifica cambios de red para evitar refetch innecesario
-      }).valueChanges;
+      const getFees$ = this._feesPageGQL
+        .watch({
+          variables: params,
+          fetchPolicy: 'cache-and-network', // Usa cache primero, solo pide a la API si no hay datos en cache
+          nextFetchPolicy: 'cache-and-network', // Mantiene la política de cache en siguientes peticiones
+          notifyOnNetworkStatusChange: false, // No notifica cambios de red para evitar refetch innecesario
+        })
+        .valueChanges;
 
-      getFees$.pipe(map((resp) => resp.data.fees)).subscribe({
-        next: ({ nodes, totalCount }) => {
+      getFees$.pipe(map((resp) => resp.data?.fees)).subscribe({
+        next: (fees) => {
+          if (!fees) return;
+
+          const nodes = (fees.nodes ?? []) as FeePartsFragment[];
+          const totalCount = fees.totalCount ?? 0;
+
           const allItems = accumulared.concat(nodes);
 
           if (allItems.length >= totalCount) {

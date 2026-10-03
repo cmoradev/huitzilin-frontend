@@ -131,9 +131,11 @@ export class ClipAccountFormDialogComponent {
   private _update(values: UpdateClipAccount) {
     return this._updateOneClipAccount
       .mutate({
-        id: this.data!.id,
-        update: {
-          ...values,
+        variables: {
+          id: this.data!.id,
+          update: {
+            ...values,
+          },
         },
       })
       .pipe(map((value) => value.data?.updateOneClipAccount));
@@ -142,8 +144,10 @@ export class ClipAccountFormDialogComponent {
   private _save(values: CreateClipAccount) {
     return this._createOneClipAccount
       .mutate({
-        account: {
-          ...values,
+        variables: {
+          account: {
+            ...values,
+          },
         },
       })
       .pipe(map((value) => value.data?.createOneClipAccount));

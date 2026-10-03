@@ -31,7 +31,7 @@ export class AuthService {
    * Este método utiliza un servicio GraphQL para autenticar al usuario y almacena la sesión en el almacenamiento de sesión del navegador.
    */
   public signIn(input: SignInInput) {
-    return this._signInGQL.mutate({ input }).pipe(
+    return this._signInGQL.mutate({ variables: { input } }).pipe(
       map(({ data }) => data?.signIn),
       tap((session) => {
         if (session) {

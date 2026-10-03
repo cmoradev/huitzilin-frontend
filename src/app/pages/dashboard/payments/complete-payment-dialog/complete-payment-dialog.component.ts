@@ -86,9 +86,11 @@ export class CompletePaymentDialogComponent implements OnInit {
 
             this._addPaymentToIncome
               .mutate({
-                input: {
-                  incomeID: this.accountsReceivable()!.id,
-                  payments,
+                variables: {
+                  input: {
+                    incomeID: this.accountsReceivable()!.id,
+                    payments,
+                  },
                 },
               })
               .subscribe({
@@ -119,21 +121,20 @@ export class CompletePaymentDialogComponent implements OnInit {
     if (this.data?.debit.id) {
       this.loading.set(true);
       this._getAccountsReceivable
-        .fetch(
-          {
+        .fetch({
+          variables: {
             input: {
               debitId: this.data!.debit.id,
             },
           },
-          {
-            fetchPolicy: 'network-only',
-          }
-        )
+          fetchPolicy: 'network-only',
+        })
         .subscribe({
           next: ({ data }) => {
-            data.getAccountsReceivable;
             this.loading.set(false);
-            this.accountsReceivable.set(data.getAccountsReceivable);
+            if (data?.getAccountsReceivable) {
+              this.accountsReceivable.set(data.getAccountsReceivable);
+            }
           },
           error: (error) => {
             // Handle any errors

@@ -54,14 +54,22 @@ export class StudentDocumentsDialogComponent implements OnInit {
         offset,
       };
 
-      const getDocuments$ = this._getDocumentsPage.watch(params, {
-        fetchPolicy: 'cache-and-network', // Usa cache primero, solo pide a la API si no hay datos en cache
-        nextFetchPolicy: 'cache-and-network', // Mantiene la política de cache en siguientes peticiones
-        notifyOnNetworkStatusChange: false, // No notifica cambios de red para evitar refetch innecesario
-      }).valueChanges;
+      const getDocuments$ = this._getDocumentsPage
+        .watch({
+          variables: params,
+          fetchPolicy: 'cache-and-network', // Usa cache primero, solo pide a la API si no hay datos en cache
+          nextFetchPolicy: 'cache-and-network', // Mantiene la política de cache en siguientes peticiones
+          notifyOnNetworkStatusChange: false, // No notifica cambios de red para evitar refetch innecesario
+        })
+        .valueChanges;
 
-      getDocuments$.pipe(map((resp) => resp.data.documents)).subscribe({
-        next: ({ nodes, totalCount }) => {
+      getDocuments$.pipe(map((resp) => resp.data?.documents)).subscribe({
+        next: (documents) => {
+          if (!documents) return;
+
+          const nodes = (documents.nodes ?? []) as DocumentPartsFragment[];
+          const totalCount = documents.totalCount ?? 0;
+
           const allItems = accumulared.concat(nodes);
 
           if (allItems.length >= totalCount) {

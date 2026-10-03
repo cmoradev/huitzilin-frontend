@@ -28,7 +28,9 @@ export class TeacherDeleteDialogComponent {
     if (!!this.data.id) {
       this.loading.set(true);
 
-      this._deleteOneTeacherGQL.mutate({ id: this.data.id }).subscribe({
+      this._deleteOneTeacherGQL
+        .mutate({ variables: { id: this.data.id } })
+        .subscribe({
         next: (teacher) => {
           this._dialogRef.close(teacher.data?.deleteOneTeacher);
         },

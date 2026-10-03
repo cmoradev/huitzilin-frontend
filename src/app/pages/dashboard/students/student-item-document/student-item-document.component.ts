@@ -43,15 +43,17 @@ export class StudentItemDocumentComponent {
           switchMap(() =>
             this._removeStudentsFromDocument
               .mutate({
-                id: this.document.id,
-                relationIds: [this.studentId],
+                variables: {
+                  id: this.document.id,
+                  relationIds: [this.studentId],
+                },
               })
               .pipe(map((resp) => resp.data?.removeStudentsFromDocument))
           ),
           switchMap(() =>
             this._deleteOneDocument
               .mutate({
-                id: this.document.id,
+                variables: { id: this.document.id },
               })
               .pipe(map((resp) => resp.data?.deleteOneDocument))
           )

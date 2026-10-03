@@ -38,17 +38,19 @@ export class BranchDeleteDialogComponent {
     if (!!this.data.id) {
       this.loading.set(true);
 
-      this._deleteOneBranch.mutate({ id: this.data.id }).subscribe({
-        next: (branch) => {
-          this._dialogRef.close(branch.data?.deleteOneBranch);
-        },
-        error: (err) => {
-          console.error('DELETE BRANCH ERROR: ', err);
-        },
-        complete: () => {
-          this.loading.set(false);
-        },
-      });
+      this._deleteOneBranch
+        .mutate({ variables: { id: this.data.id } })
+        .subscribe({
+          next: (branch) => {
+            this._dialogRef.close(branch.data?.deleteOneBranch);
+          },
+          error: (err) => {
+            console.error('DELETE BRANCH ERROR: ', err);
+          },
+          complete: () => {
+            this.loading.set(false);
+          },
+        });
     }
   }
 }

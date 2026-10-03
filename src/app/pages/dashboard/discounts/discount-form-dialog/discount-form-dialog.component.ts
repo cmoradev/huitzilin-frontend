@@ -151,8 +151,10 @@ export class DiscountFormDialogComponent {
   private _update(values: UpdateDiscount) {
     return this._updateOneCycle
       .mutate({
-        id: this.data!.id,
-        update: values,
+        variables: {
+          id: this.data!.id,
+          update: values,
+        },
       })
       .pipe(map((value) => value.data?.updateOneDiscount));
   }
@@ -160,7 +162,9 @@ export class DiscountFormDialogComponent {
   private _save(values: Omit<CreateDiscount, 'branchId'>) {
     return this._createOneCycle
       .mutate({
-        discount: { ...values, branchId: this._globalStateService.branch!.id },
+        variables: {
+          discount: { ...values, branchId: this._globalStateService.branch!.id },
+        },
       })
       .pipe(map((value) => value.data?.createOneDiscount));
   }

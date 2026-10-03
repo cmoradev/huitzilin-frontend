@@ -97,9 +97,11 @@ export class LevelFormDialogComponent {
   private _update(values: FormValues) {
     return this._updateOneLevel
       .mutate({
-        id: this.data!.id,
-        update: {
-          ...values,
+        variables: {
+          id: this.data!.id,
+          update: {
+            ...values,
+          },
         },
       })
       .pipe(map((value) => value.data?.updateOneLevel));
@@ -108,10 +110,12 @@ export class LevelFormDialogComponent {
   private _save(values: FormValues) {
     return this._createOneLevel
       .mutate({
-        level: {
-          ...values,
-          order: 0,
-          branchId: this._globalStateService.branch!.id,
+        variables: {
+          level: {
+            ...values,
+            order: 0,
+            branchId: this._globalStateService.branch!.id,
+          },
         },
       })
       .pipe(map((value) => value.data?.createOneLevel));

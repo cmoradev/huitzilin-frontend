@@ -26,7 +26,9 @@ export class DisciplineDeleteDialogComponent {
     if (!!this.data.id) {
       this.loading.set(true);
 
-      this._deleteOneDiscipline.mutate({ id: this.data.id }).subscribe({
+      this._deleteOneDiscipline
+        .mutate({ variables: { id: this.data.id } })
+        .subscribe({
         next: (cycle) => {
           this._dialogRef.close(cycle.data?.deleteOneDiscipline);
           this._snackBar.open('Se ha eliminado correctamente', 'Cerrar', {

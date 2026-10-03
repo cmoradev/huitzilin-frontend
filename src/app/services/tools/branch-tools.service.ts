@@ -21,18 +21,27 @@ export class BranchToolsService {
       filter: { name: { iLike: `%${query}%` } },
     };
 
-    const fetch$ = this._fetch.watch(variables, {
-      fetchPolicy: 'cache-and-network',
-      nextFetchPolicy: 'cache-and-network',
-      notifyOnNetworkStatusChange: true,
-    }).valueChanges;
+    const fetch$ = this._fetch
+      .watch({
+        variables,
+        fetchPolicy: 'cache-and-network',
+        nextFetchPolicy: 'cache-and-network',
+        notifyOnNetworkStatusChange: true,
+      })
+      .valueChanges;
 
     fetch$
       .pipe(
         map(({ data, loading }) => {
+          const nodes = data?.branches?.nodes as BranchPartsFragment[];
+          if (!data || !nodes) {
+            this.loading.set(loading);
+            return [];
+          }
+
           this.loading.set(loading);
-          this.options.set(data.branches.nodes);
-          return data.branches.nodes;
+          this.options.set(nodes);
+          return nodes;
         })
       )
       .subscribe({
@@ -53,15 +62,25 @@ export class BranchToolsService {
       offset,
     };
 
-    const fetch$ = this._fetch.watch(variables, {
-      fetchPolicy: 'cache-and-network', // Usa cache primero, solo pide a la API si no hay datos en cache
-      nextFetchPolicy: 'cache-and-network', // Mantiene la política de cache en siguientes peticiones
-      notifyOnNetworkStatusChange: false, // No notifica cambios de red para evitar refetch innecesario
-    }).valueChanges;
+    const fetch$ = this._fetch
+      .watch({
+        variables,
+        fetchPolicy: 'cache-and-network', // Usa cache primero, solo pide a la API si no hay datos en cache
+        nextFetchPolicy: 'cache-and-network', // Mantiene la política de cache en siguientes peticiones
+        notifyOnNetworkStatusChange: false, // No notifica cambios de red para evitar refetch innecesario
+      })
+      .valueChanges;
 
-    fetch$.pipe(map((resp) => resp.data.branches)).subscribe({
-      next: ({ nodes, totalCount }) => {
-        const allItems = accumulared.concat(nodes);
+    fetch$.pipe(map((resp) => resp.data?.branches)).subscribe({
+      next: (branches) => {
+        if (!branches) {
+          return;
+        }
+
+        const { nodes = [], totalCount = 0 } = branches;
+        const typedNodes = nodes as BranchPartsFragment[];
+
+        const allItems = accumulared.concat(typedNodes);
 
         if (allItems.length >= totalCount) {
           this.options.set(allItems);
@@ -73,6 +92,7 @@ export class BranchToolsService {
       },
       error: (error) => {
         console.error('Error fetching disciplines', error);
+        this.loading.set(false);
       },
     });
   }

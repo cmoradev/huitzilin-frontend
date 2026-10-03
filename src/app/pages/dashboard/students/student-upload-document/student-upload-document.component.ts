@@ -35,10 +35,12 @@ export class StudentUploadDocumentComponent {
           switchMap((url) =>
             this._createOneDocument
               .mutate({
-                document: {
-                  key: this.documentKey,
-                  name: this.documentName,
-                  url,
+                variables: {
+                  document: {
+                    key: this.documentKey,
+                    name: this.documentName,
+                    url,
+                  },
                 },
               })
               .pipe(map((response) => response.data?.createOneDocument))
@@ -46,8 +48,10 @@ export class StudentUploadDocumentComponent {
           switchMap((document) =>
             this._addStudentsToDocument
               .mutate({
-                id: document!.id,
-                relationIds: [this.studentId],
+                variables: {
+                  id: document!.id,
+                  relationIds: [this.studentId],
+                },
               })
               .pipe(map(() => document))
           )

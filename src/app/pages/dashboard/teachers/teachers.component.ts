@@ -105,17 +105,17 @@ export class TeachersComponent implements AfterViewInit {
     };
 
     this._teachersPageGQL
-      .watch(
-        { limit, offset, filter },
-        {
-          fetchPolicy: 'cache-and-network',
-          nextFetchPolicy: 'cache-and-network',
-          notifyOnNetworkStatusChange: true,
-        }
-      )
+      .watch({
+        variables: { limit, offset, filter },
+        fetchPolicy: 'cache-and-network',
+        nextFetchPolicy: 'cache-and-network',
+        notifyOnNetworkStatusChange: true,
+      })
       .valueChanges.subscribe({
         next: ({ data, loading }) => {
-          const { nodes, totalCount } = data.teachers;
+          const teachers = data?.teachers;
+          const nodes = (teachers?.nodes ?? []) as TeacherPartsFragment[];
+          const totalCount = teachers?.totalCount ?? 0;
 
           this.dataSource.data = nodes.map((node) => {
             return {

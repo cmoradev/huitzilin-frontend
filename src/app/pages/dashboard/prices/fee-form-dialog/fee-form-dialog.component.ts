@@ -125,8 +125,10 @@ export class FeeFormDialogComponent implements OnInit {
   private _update(values: FormValues) {
     return this._updateOneFee
       .mutate({
-        id: this.data!.id,
-        update: { ...values } as any,
+        variables: {
+          id: this.data!.id,
+          update: { ...values } as any,
+        },
       })
       .pipe(map((value) => value.data?.updateOneFee));
   }
@@ -134,10 +136,12 @@ export class FeeFormDialogComponent implements OnInit {
   private _save(values: FormValues) {
     return this._createOneFee
       .mutate({
-        fee: {
-          ...values,
-          withTax: false,
-          packageId: this._globalStateService.activity!.id,
+        variables: {
+          fee: {
+            ...values,
+            withTax: false,
+            packageId: this._globalStateService.activity!.id,
+          },
         },
       })
       .pipe(map((value) => value.data?.createOneFee));

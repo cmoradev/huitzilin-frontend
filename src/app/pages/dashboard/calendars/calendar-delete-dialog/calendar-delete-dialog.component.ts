@@ -28,7 +28,9 @@ export class CalendarDeleteDialogComponent {
     if (!!this.data.id) {
       this.loading.set(true);
 
-      this._deleteOnePeriod.mutate({ id: this.data.id }).subscribe({
+      this._deleteOnePeriod
+        .mutate({ variables: { id: this.data.id } })
+        .subscribe({
         next: (cycle) => {
           this._dialogRef.close(cycle.data?.deleteOnePeriod);
         },

@@ -177,14 +177,16 @@ export class CalendarFormDialogComponent implements OnInit {
   private _update(values: FormValues) {
     return this._updateOnePeriod
       .mutate({
-        id: this.data!.id,
-        update: {
-          name: values.name,
-          days: values.days.join(','),
-          start: values.start.toISOString(),
-          end: values.end.toISOString(),
-          firstHour: values.firstHour.toTimeString().slice(0, 5),
-          lastHour: values.lastHour.toTimeString().slice(0, 5),
+        variables: {
+          id: this.data!.id,
+          update: {
+            name: values.name,
+            days: values.days.join(','),
+            start: values.start.toISOString(),
+            end: values.end.toISOString(),
+            firstHour: values.firstHour.toTimeString().slice(0, 5),
+            lastHour: values.lastHour.toTimeString().slice(0, 5),
+          },
         },
       })
       .pipe(map((value) => value.data?.updateOnePeriod));
@@ -193,15 +195,17 @@ export class CalendarFormDialogComponent implements OnInit {
   private _save(values: FormValues) {
     return this._createOnePeriod
       .mutate({
-        period: {
-          name: values.name,
-          days: values.days.join(','),
-          start: values.start.toISOString(),
-          end: values.end.toISOString(),
-          firstHour: values.firstHour.toTimeString().slice(0, 5),
-          lastHour: values.lastHour.toTimeString().slice(0, 5),
-          branchId: this._globalStateService.branch!.id,
-          order: 0,
+        variables: {
+          period: {
+            name: values.name,
+            days: values.days.join(','),
+            start: values.start.toISOString(),
+            end: values.end.toISOString(),
+            firstHour: values.firstHour.toTimeString().slice(0, 5),
+            lastHour: values.lastHour.toTimeString().slice(0, 5),
+            branchId: this._globalStateService.branch!.id,
+            order: 0,
+          },
         },
       })
       .pipe(map((value) => value.data?.createOnePeriod));

@@ -108,8 +108,10 @@ export class GlobalStateSettingsComponent implements AfterViewInit, OnInit {
     if (this._globalStateService.session!.id) {
       this._updateOneUserGQL
         .mutate({
-          id: this._globalStateService.session!.id,
-          update,
+          variables: {
+            id: this._globalStateService.session!.id,
+            update,
+          },
         })
         .subscribe({});
     }

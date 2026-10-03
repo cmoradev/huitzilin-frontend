@@ -122,17 +122,17 @@ export class LevelsComponent {
     };
 
     this._levelsPageGQL
-      .watch(
-        { limit, offset, filter },
-        {
-          fetchPolicy: 'cache-and-network',
-          nextFetchPolicy: 'cache-and-network',
-          notifyOnNetworkStatusChange: true,
-        }
-      )
+      .watch({
+        variables: { limit, offset, filter },
+        fetchPolicy: 'cache-and-network',
+        nextFetchPolicy: 'cache-and-network',
+        notifyOnNetworkStatusChange: true,
+      })
       .valueChanges.subscribe({
         next: ({ data, loading }) => {
-          const { nodes, totalCount } = data.levels;
+          const levels = data?.levels;
+          const nodes = (levels?.nodes ?? []) as LevelPartsFragment[];
+          const totalCount = levels?.totalCount ?? 0;
 
           this.dataSource.data = nodes;
 
@@ -161,7 +161,7 @@ export class LevelsComponent {
       })
     );
 
-    this._setOrderLevelsGQL.mutate({ payload }).subscribe({
+    this._setOrderLevelsGQL.mutate({ variables: { payload } }).subscribe({
       next: () => {
         this._snackBar.open('Se ha actualizado el orden correctamente', 'Cerrar', {
           duration: 1000,

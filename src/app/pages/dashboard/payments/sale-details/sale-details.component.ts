@@ -112,10 +112,12 @@ export class SaleDetailsComponent {
           if (!!studentIDs.length && !!concepts.length) {
             this._createIncomes
               .mutate({
-                input: {
-                  studentIDs,
-                  payments,
-                  concepts,
+                variables: {
+                  input: {
+                    studentIDs,
+                    payments,
+                    concepts,
+                  },
                 },
               })
               .subscribe({

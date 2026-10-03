@@ -28,18 +28,27 @@ export class PackageToolsService {
         },
       };
 
-      const fetch$ = this._fetch.watch(variables, {
-        fetchPolicy: 'cache-and-network',
-        nextFetchPolicy: 'cache-and-network',
-        notifyOnNetworkStatusChange: true,
-      }).valueChanges;
+      const fetch$ = this._fetch
+        .watch({
+          variables,
+          fetchPolicy: 'cache-and-network',
+          nextFetchPolicy: 'cache-and-network',
+          notifyOnNetworkStatusChange: true,
+        })
+        .valueChanges;
 
       fetch$
         .pipe(
           map(({ data, loading }) => {
+            const nodes = data?.packages?.nodes as PackagePartsFragment[];
+            if (!data || !nodes) {
+              this.loading.set(loading);
+              return [];
+            }
+
             this.loading.set(loading);
-            this.options.set(data.packages.nodes);
-            return data.packages.nodes;
+            this.options.set(nodes);
+            return nodes;
           })
         )
         .subscribe({
@@ -63,15 +72,25 @@ export class PackageToolsService {
         offset,
       };
 
-      const fetch$ = this._fetch.watch(variables, {
-        fetchPolicy: 'cache-and-network', // Usa cache primero, solo pide a la API si no hay datos en cache
-        nextFetchPolicy: 'cache-and-network', // Mantiene la política de cache en siguientes peticiones
-        notifyOnNetworkStatusChange: false, // No notifica cambios de red para evitar refetch innecesario
-      }).valueChanges;
+      const fetch$ = this._fetch
+        .watch({
+          variables,
+          fetchPolicy: 'cache-and-network', // Usa cache primero, solo pide a la API si no hay datos en cache
+          nextFetchPolicy: 'cache-and-network', // Mantiene la política de cache en siguientes peticiones
+          notifyOnNetworkStatusChange: false, // No notifica cambios de red para evitar refetch innecesario
+        })
+        .valueChanges;
 
-      fetch$.pipe(map((resp) => resp.data.packages)).subscribe({
-        next: ({ nodes, totalCount }) => {
-          const allItems = accumulared.concat(nodes);
+      fetch$.pipe(map((resp) => resp.data?.packages)).subscribe({
+        next: (packages) => {
+          if (!packages) {
+            return;
+          }
+
+          const { nodes = [], totalCount = 0 } = packages;
+          const typedNodes = nodes as PackagePartsFragment[];
+
+          const allItems = accumulared.concat(typedNodes);
 
           if (allItems.length >= totalCount) {
             this.options.set(allItems);
@@ -83,6 +102,7 @@ export class PackageToolsService {
         },
         error: (error) => {
           console.error('Error fetching packages', error);
+          this.loading.set(false);
         },
       });
     }

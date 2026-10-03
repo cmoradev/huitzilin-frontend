@@ -75,14 +75,23 @@ export class PaymentsComponent implements OnInit {
         offset,
       };
 
-      const getEnrollments$ = this._getEnrollmentsPage.watch(params, {
-        fetchPolicy: 'cache-and-network', // Usa cache primero, solo pide a la API si no hay datos en cache
-        nextFetchPolicy: 'cache-and-network', // Mantiene la política de cache en siguientes peticiones
-        notifyOnNetworkStatusChange: false, // No notifica cambios de red para evitar refetch innecesario
-      }).valueChanges;
+      const getEnrollments$ = this._getEnrollmentsPage
+        .watch({
+          variables: params,
+          fetchPolicy: 'cache-and-network', // Usa cache primero, solo pide a la API si no hay datos en cache
+          nextFetchPolicy: 'cache-and-network', // Mantiene la política de cache en siguientes peticiones
+          notifyOnNetworkStatusChange: false, // No notifica cambios de red para evitar refetch innecesario
+        })
+        .valueChanges;
 
-      getEnrollments$.pipe(map((resp) => resp.data.enrollments)).subscribe({
-        next: ({ nodes, totalCount }) => {
+      getEnrollments$.pipe(map((resp) => resp.data?.enrollments)).subscribe({
+        next: (enrollments) => {
+          if (!enrollments) return;
+
+          const nodes = (enrollments.nodes ??
+            []) as CurrentEnrollmentPartsFragment[];
+          const totalCount = enrollments.totalCount ?? 0;
+
           const allItems = accumulared.concat(nodes);
 
           if (allItems.length >= totalCount) {

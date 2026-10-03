@@ -118,17 +118,17 @@ export class BranchsComponent implements AfterViewInit {
     };
 
     this._companiesPageGQL
-      .watch(
-        { limit, offset, filter },
-        {
-          fetchPolicy: 'cache-and-network',
-          nextFetchPolicy: 'cache-and-network',
-          notifyOnNetworkStatusChange: true,
-        }
-      )
+      .watch({
+        variables: { limit, offset, filter },
+        fetchPolicy: 'cache-and-network',
+        nextFetchPolicy: 'cache-and-network',
+        notifyOnNetworkStatusChange: true,
+      })
       .valueChanges.subscribe({
         next: ({ data, loading }) => {
-          const { nodes, totalCount } = data.branches;
+          const branches = data?.branches;
+          const nodes = (branches?.nodes ?? []) as BranchPartsFragment[];
+          const totalCount = branches?.totalCount ?? 0;
 
           this.dataSource.data = nodes;
 

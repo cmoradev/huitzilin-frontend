@@ -74,18 +74,17 @@ export class UsersComponent implements AfterViewInit {
     };
 
     this._usersPageGQL
-      .watch(
-        { limit, offset, filter },
-        {
-          fetchPolicy: 'cache-and-network',
-          nextFetchPolicy: 'cache-and-network',
-          notifyOnNetworkStatusChange: true,
-        }
-      )
+      .watch({
+        variables: { limit, offset, filter },
+        fetchPolicy: 'cache-and-network',
+        nextFetchPolicy: 'cache-and-network',
+        notifyOnNetworkStatusChange: true,
+      })
       .valueChanges.subscribe({
         next: ({ data, loading }) => {
-          const { nodes, totalCount } = data.users;
-          console.log(nodes);
+          const users = data?.users;
+          const nodes = (users?.nodes ?? []) as UserPartsFragment[];
+          const totalCount = users?.totalCount ?? 0;
 
           this.dataSource.data = nodes;
 

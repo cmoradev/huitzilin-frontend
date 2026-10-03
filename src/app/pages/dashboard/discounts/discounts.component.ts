@@ -103,17 +103,18 @@ export class DiscountsComponent {
       };
 
       this._discountsPageGQL
-        .watch(
-          { limit, offset, filter },
-          {
-            fetchPolicy: 'cache-and-network',
-            nextFetchPolicy: 'cache-and-network',
-            notifyOnNetworkStatusChange: true,
-          }
-        )
+        .watch({
+          variables: { limit, offset, filter },
+          fetchPolicy: 'cache-and-network',
+          nextFetchPolicy: 'cache-and-network',
+          notifyOnNetworkStatusChange: true,
+        })
         .valueChanges.subscribe({
           next: ({ data, loading }) => {
-            const { nodes, totalCount } = data.discounts;
+            const discounts = data?.discounts;
+            const nodes = (discounts?.nodes ??
+              []) as DiscountPartsFragment[];
+            const totalCount = discounts?.totalCount ?? 0;
 
             this.dataSource.data = nodes;
 

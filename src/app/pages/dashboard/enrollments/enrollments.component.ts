@@ -26,7 +26,7 @@ import {
 } from '@graphql';
 import { GlobalStateService } from '@services';
 import { NgScrollbar } from 'ngx-scrollbar';
-import { debounceTime, map, merge } from 'rxjs';
+import { debounceTime, map, merge, tap } from 'rxjs';
 import { DebitDeleteDialogComponent } from './debit-delete-dialog/debit-delete-dialog.component';
 import { DebitFormCatalogDialogComponent } from './debit-form-catalog-dialog/debit-form-catalog-dialog.component';
 import { DebitFormDialogComponent } from './debit-form-dialog/debit-form-dialog.component';
@@ -219,19 +219,30 @@ export class EnrollmentsComponent implements OnInit {
       this.enrollmentsLoading.set(true);
 
       this._enrollmentsPageGQL
-        .watch(params, {
+        .watch({
+          variables: params,
           fetchPolicy: 'cache-and-network',
           nextFetchPolicy: 'cache-and-network',
           notifyOnNetworkStatusChange: true,
         })
-        .valueChanges.pipe(map((resp) => resp.data.enrollments))
+        .valueChanges
+        .pipe(
+          tap((resp) => this.enrollmentsLoading.set(resp.loading)),
+          map((resp) => resp.data?.enrollments)
+        )
         .subscribe({
-          next: ({ nodes, totalCount }) => {
-            const allItems = accumulared.concat(nodes);
+          next: (enrollments) => {
+            if (!enrollments) {
+              return;
+            }
+
+            const { nodes = [], totalCount = 0 } = enrollments;
+            const typedNodes = nodes as EnrollmentPartsFragment[];
+
+            const allItems = accumulared.concat(typedNodes);
 
             if (allItems.length >= totalCount) {
               this.enrollments.set(allItems);
-              this.enrollmentsLoading.set(false);
               this.enrollmentsTotalCount.set(totalCount);
               return; // No more activities to fetch
             }
@@ -256,8 +267,8 @@ export class EnrollmentsComponent implements OnInit {
 
       // TODO: Cambiar el limit a 10 y usar un fetchMore scroll infinito
       this._debitsPageGQL
-        .watch(
-          {
+        .watch({
+          variables: {
             filter: {
               enrollmentId: { eq: this._globalStateService.enrollment!.id },
             },
@@ -265,19 +276,23 @@ export class EnrollmentsComponent implements OnInit {
             limit: 50,
             offset: 0,
           },
-          {
-            fetchPolicy: 'cache-and-network',
-            nextFetchPolicy: 'cache-and-network',
-            notifyOnNetworkStatusChange: true,
-          }
-        )
+          fetchPolicy: 'cache-and-network',
+          nextFetchPolicy: 'cache-and-network',
+          notifyOnNetworkStatusChange: true,
+        })
         .valueChanges.subscribe({
           next: ({ data, loading }) => {
-            const { nodes, totalCount } = data.debits;
+            const debits = data?.debits;
+            const nodes = (debits?.nodes ?? []) as DebitPartsFragment[];
+            const totalCount = debits?.totalCount ?? 0;
 
             this.debits.set(nodes);
             this.debitsLoading.set(loading);
             this.debitsTotalCount.set(totalCount);
+          },
+          error: (error) => {
+            console.error('Error fetching debits', error);
+            this.debitsLoading.set(false);
           },
         });
     } else {
@@ -303,7 +318,7 @@ export class EnrollmentsComponent implements OnInit {
       order: index + 1,
     }));
 
-    this._setOrderEnrollmentGQL.mutate({ payload }).subscribe({
+    this._setOrderEnrollmentGQL.mutate({ variables: { payload } }).subscribe({
       next: () => {
         this._snackBar.open(
           'Se ha actualizado el orden correctamente',

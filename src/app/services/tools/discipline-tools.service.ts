@@ -27,18 +27,27 @@ export class DisciplineToolsService {
           },
         };
     
-        const fetch$ = this._fetch.watch(variables, {
-          fetchPolicy: 'cache-and-network',
-          nextFetchPolicy: 'cache-and-network',
-          notifyOnNetworkStatusChange: true,
-        }).valueChanges;
-    
+        const fetch$ = this._fetch
+          .watch({
+            variables,
+            fetchPolicy: 'cache-and-network',
+            nextFetchPolicy: 'cache-and-network',
+            notifyOnNetworkStatusChange: true,
+          })
+          .valueChanges;
+
         fetch$
           .pipe(
             map(({ data, loading }) => {
+              const nodes = data?.disciplines?.nodes as DisciplinePartsFragment[];
+              if (!data || !nodes) {
+                this.loading.set(loading);
+                return [];
+              }
+
               this.loading.set(loading);
-              this.options.set(data.disciplines.nodes);
-              return data.disciplines.nodes;
+              this.options.set(nodes);
+              return nodes;
             })
           )
           .subscribe({
@@ -62,15 +71,25 @@ export class DisciplineToolsService {
         offset,
       };
 
-      const fetch$ = this._fetch.watch(variables, {
-        fetchPolicy: 'cache-and-network', // Usa cache primero, solo pide a la API si no hay datos en cache
-        nextFetchPolicy: 'cache-and-network', // Mantiene la política de cache en siguientes peticiones
-        notifyOnNetworkStatusChange: false, // No notifica cambios de red para evitar refetch innecesario
-      }).valueChanges;
+      const fetch$ = this._fetch
+        .watch({
+          variables,
+          fetchPolicy: 'cache-and-network', // Usa cache primero, solo pide a la API si no hay datos en cache
+          nextFetchPolicy: 'cache-and-network', // Mantiene la política de cache en siguientes peticiones
+          notifyOnNetworkStatusChange: false, // No notifica cambios de red para evitar refetch innecesario
+        })
+        .valueChanges;
 
-      fetch$.pipe(map((resp) => resp.data.disciplines)).subscribe({
-        next: ({ nodes, totalCount }) => {
-          const allItems = accumulared.concat(nodes);
+      fetch$.pipe(map((resp) => resp.data?.disciplines)).subscribe({
+        next: (disciplines) => {
+          if (!disciplines) {
+            return;
+          }
+
+          const { nodes = [], totalCount = 0 } = disciplines;
+          const typedNodes = nodes as DisciplinePartsFragment[];
+
+          const allItems = accumulared.concat(typedNodes);
 
           if (allItems.length >= totalCount) {
             this.options.set(allItems);
@@ -82,6 +101,7 @@ export class DisciplineToolsService {
         },
         error: (error) => {
           console.error('Error fetching disciplines', error);
+          this.loading.set(false);
         },
       });
     }

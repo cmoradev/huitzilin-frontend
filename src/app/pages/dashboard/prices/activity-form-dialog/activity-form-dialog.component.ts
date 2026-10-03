@@ -96,8 +96,10 @@ export class ActivityFormDialogComponent implements OnInit {
   private _update(values: FormValues) {
     return this._updateOnePackage
       .mutate({
-        id: this.data!.id,
-        update: { ...this._withDefaults(values) } as any,
+        variables: {
+          id: this.data!.id,
+          update: { ...this._withDefaults(values) } as any,
+        },
       })
       .pipe(map((value) => value.data?.updateOnePackage));
   }
@@ -105,10 +107,12 @@ export class ActivityFormDialogComponent implements OnInit {
   private _save(values: FormValues) {
     return this._createOnePackage
       .mutate({
-        package: {
-          ...this._withDefaults(values),
-          branchId: this._globalStateService.branch!.id,
-          order: 1,
+        variables: {
+          package: {
+            ...this._withDefaults(values),
+            branchId: this._globalStateService.branch!.id,
+            order: 1,
+          },
         },
       })
       .pipe(map((value) => value.data?.createOnePackage));

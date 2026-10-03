@@ -78,14 +78,22 @@ export class SelectDebitDiscountFormDialogComponent {
         offset,
       };
 
-      const getDiscounts$ = this._discountsPageGQL.watch(params, {
-        fetchPolicy: 'cache-and-network', // Usa cache primero, solo pide a la API si no hay datos en cache
-        nextFetchPolicy: 'cache-and-network', // Mantiene la política de cache en siguientes peticiones
-        notifyOnNetworkStatusChange: false, // No notifica cambios de red para evitar refetch innecesario
-      }).valueChanges;
+      const getDiscounts$ = this._discountsPageGQL
+        .watch({
+          variables: params,
+          fetchPolicy: 'cache-and-network', // Usa cache primero, solo pide a la API si no hay datos en cache
+          nextFetchPolicy: 'cache-and-network', // Mantiene la política de cache en siguientes peticiones
+          notifyOnNetworkStatusChange: false, // No notifica cambios de red para evitar refetch innecesario
+        })
+        .valueChanges;
 
-      getDiscounts$.pipe(map((resp) => resp.data.discounts)).subscribe({
-        next: ({ nodes, totalCount }) => {
+      getDiscounts$.pipe(map((resp) => resp.data?.discounts)).subscribe({
+        next: (discounts) => {
+          if (!discounts) return;
+
+          const nodes = (discounts.nodes ?? []) as DiscountPartsFragment[];
+          const totalCount = discounts.totalCount ?? 0;
+
           const allItems = accumulared.concat(nodes);
 
           if (allItems.length >= totalCount) {

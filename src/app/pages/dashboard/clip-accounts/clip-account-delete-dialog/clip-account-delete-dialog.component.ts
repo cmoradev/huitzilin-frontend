@@ -27,7 +27,9 @@ export class ClipAccountDeleteDialogComponent {
     if (!!this.data.id) {
       this.loading.set(true);
 
-      this._deleteOneClipAccount.mutate({ id: this.data.id }).subscribe({
+      this._deleteOneClipAccount
+        .mutate({ variables: { id: this.data.id } })
+        .subscribe({
         next: ({ data }) => {
           this._dialogRef.close(data?.deleteOneClipAccount);
         },
