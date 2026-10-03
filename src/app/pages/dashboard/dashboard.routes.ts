@@ -25,7 +25,7 @@ export const DashboardRoutes: Routes = [
     path: 'enrollments',
     loadComponent: () =>
       import('./enrollments/enrollments.component').then(
-        (m) => m.EnrollmentsComponent
+        (m) => m.EnrollmentsComponent,
       ),
   },
   {
@@ -47,21 +47,21 @@ export const DashboardRoutes: Routes = [
     path: 'disciplines',
     loadComponent: () =>
       import('./disciplines/disciplines.component').then(
-        (m) => m.DisciplinesComponent
+        (m) => m.DisciplinesComponent,
       ),
   },
   {
     path: 'calendars',
     loadComponent: () =>
       import('./calendars/calendar-page.component').then(
-        (m) => m.CalendarPageComponent
+        (m) => m.CalendarPageComponent,
       ),
   },
   {
     path: 'discounts',
     loadComponent: () =>
       import('./discounts/discounts.component').then(
-        (m) => m.DiscountsComponent
+        (m) => m.DiscountsComponent,
       ),
   },
   {
@@ -73,7 +73,7 @@ export const DashboardRoutes: Routes = [
     path: 'clip-accounts',
     loadComponent: () =>
       import('./clip-accounts/clip-accounts.component').then(
-        (m) => m.ClipAccountsComponent
+        (m) => m.ClipAccountsComponent,
       ),
   },
   {
