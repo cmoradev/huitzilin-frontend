@@ -12,11 +12,6 @@ export const DashboardRoutes: Routes = [
       import('./students/students.component').then((m) => m.StudentsComponent),
   },
   {
-    path: 'teachers',
-    loadComponent: () =>
-      import('./teachers/teachers.component').then((m) => m.TeachersComponent),
-  },
-  {
     path: 'payments',
     loadComponent: () =>
       import('./payments/payments.component').then((m) => m.PaymentsComponent),
